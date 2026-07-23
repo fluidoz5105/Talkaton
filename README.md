@@ -1,1 +1,2 @@
-# Talkaton
+
+These are the files I used/using to make Talkaton. Feel free to use them all. You can contact me and ask questions at my email, or just spam my inbox. But please don't. If there are bugs, contact me and I will fix it. I can also help setting it up if you email me. I also made Talkaton because I wanted my own AI, and I was bored. If you haven't already, and were just browsing on GitHub, please visit https://talkaton.org. Also, making Talkaton took up to 2 months. I haven't been keeping track. I think I started around May 2026.
