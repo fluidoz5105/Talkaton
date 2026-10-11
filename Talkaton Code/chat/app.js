@@ -1,12 +1,14 @@
-import { createId, getVisitorId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20260728-model-compare19";
+import { createId, loadStoredState, saveStoredState, serializeForCloud, loadCloudData, saveCloudData } from "../modules/storage.js?v=20260729-private-guard1";
+import { isLikelyPrivateBrowsing } from "../modules/private-browser.js?v=20260729-private-guard1";
 import {
   ACCEPTED_FILE_LABEL,
   attachmentGlyph,
   formatFileSize,
   prepareFiles,
   prepareFolder
-} from "../modules/uploads.js?v=20260728-model-compare19";
-import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260728-model-compare19";
+} from "../modules/uploads.js?v=20260729-collaboration1";
+import { isMessageSubmitKey } from "../modules/keyboard.js?v=20260729-collaboration1";
+import { createSharedAuthStorage } from "../modules/shared-auth-storage.js?v=20260813-shared-session1";
 
 const CONFIG = {
   SUPABASE_URL: "https://cxulgeojkjnskdyoktkj.supabase.co",
@@ -23,6 +25,11 @@ const CONFIG = {
       label: "Owner",
       description: "Full owner access · unlimited"
     },
+    "donotuseunlessyouaretalkanter@gmail.com": {
+      tier: "owner_alt",
+      label: "Owner Alt Acount",
+      description: "Alternate owner access · unlimited"
+    },
     "supportaton@gmail.com": {
       tier: "support",
       label: "Support",
@@ -30,47 +37,63 @@ const CONFIG = {
     }
   },
   DAILY_LIMITS: {
-    guest: 25,
-    free: 45
+    guest: 75,
+    free: 250,
+    plus: 1500,
+    pro: 5000,
+    max: 10000
   },
   BETA_DAILY_LIMITS: {
-    messages: 100,
-    images: 25,
-    searches: 40
+    messages: 750,
+    images: 60,
+    searches: 200
   },
   IMAGE_DAILY_LIMITS: {
-    guest: 5,
-    free: 10
+    guest: 0,
+    free: 20,
+    plus: 75,
+    pro: 250,
+    max: 500
   },
   SEARCH_DAILY_LIMITS: {
-    guest: 5,
-    free: 15
+    guest: 25,
+    free: 75,
+    plus: 300,
+    pro: 1000,
+    max: 2500
   }
 };
 
 const MODEL_NAMES = {
+  "ollama/default": "Ollama",
   "openai/gpt-5.4-nano": "GPT-5.4 Nano",
   "openai/gpt-4.1-mini": "GPT-4.1 Mini",
   "anthropic/claude-3-haiku": "Claude 3 Haiku",
   "google/gemini-2.5-flash-lite": "Gemini",
+  "~google/gemini-flash-latest": "Gemini Flash (1.5 successor)",
+  "microsoft/phi-4": "Phi 4 (3.5 Mini successor)",
+  "cohere/command-r-08-2024": "Command R",
+  "qwen/qwen-2.5-72b-instruct": "Qwen 2.5 72B",
   "deepseek/deepseek-chat": "DeepSeek Chat",
   "meta-llama/llama-3.1-8b-instruct": "Llama 3.1 8B",
   "mistralai/mistral-small-3.1-24b-instruct": "Mistral Small",
-  "openai/gpt-5.4-mini": "GPT-5.4 Mini"
+  "openai/gpt-5.4-mini": "GPT-5.4 Mini",
+  "ollama/gemma3:12b": "Ollama Backup · Gemma 3 12B"
 };
 
-const FREE_MODELS = new Set([
-  "openai/gpt-5.4-nano",
-  "deepseek/deepseek-chat",
-  "meta-llama/llama-3.1-8b-instruct",
-  "mistralai/mistral-small-3.1-24b-instruct"
-]);
+const PAID_TIERS = new Set(["plus", "pro", "max"]);
+
+
 
 const MODEL_ALIASES = {
-  "google/gemini-pro": "google/gemini-2.5-flash-lite"
+  "google/gemini-pro": "google/gemini-2.5-flash-lite",
+  "google/gemini-flash-1.5": "~google/gemini-flash-latest",
+  "gemini-1.5-flash": "~google/gemini-flash-latest",
+  "microsoft/phi-3.5-mini-128k-instruct": "microsoft/phi-4",
+  "phi-3.5-mini": "microsoft/phi-4",
+  "command-r": "cohere/command-r-08-2024",
+  "qwen-2.5": "qwen/qwen-2.5-72b-instruct"
 };
-
-const RESPONSE_MODES = new Set(["Normal", "Chaos", "Safe Mode", "Coder Mode", "Creative", "Beta Lab"]);
 
 const defaultState = {
   user: null,
@@ -79,8 +102,7 @@ const defaultState = {
   currentChatId: null,
   memory: [],
   loading: false,
-  mode: "Normal",
-  model: "openai/gpt-5.4-nano",
+  model: "ollama/default",
   settings: {
     voice: true,
     markdown: true,
@@ -88,7 +110,11 @@ const defaultState = {
     timestamps: false,
     autoScroll: true,
     theme: "system",
-    speechRate: 1,},
+    speechRate: 1,
+    voiceURI: "",
+    chatFolders: [],
+    activeFolderId: "all"
+  },
   sidebarCollapsed: false,
   pendingAttachments: [],
   dailyMessageCount: 0,
@@ -117,13 +143,34 @@ let touchScrollY = null;
 let dragDepth = 0;
 let activePromptResolver = null;
 let recognition = null;
+let voiceFinalTranscript = "";
+let voiceSending = false;
+let voiceConversationActive = false;
+let voiceMicrophonePermissionGranted = false;
+let voiceRestartTimer = null;
+let voiceSpeechResolver = null;
+let voiceUseRecordedTranscription = false;
+let voiceRecorder = null;
+let voiceRecorderStream = null;
+let voiceRecorderChunks = [];
+let voiceRecorderCancelled = false;
+let voiceAudioContext = null;
+let voiceSilenceFrame = null;
+let voiceRecorderTimeout = null;
+let voiceRecordingStartedAt = 0;
+let voiceLastSoundAt = 0;
+let voiceSoundDetected = false;
 let searchMode = false;
 let compareMode = false;
+let incognitoMode = false;
 let authMode = "signIn";
+let googleAuthEnabled = false;
 let passwordRecoveryPending = false;
 let signupConfirmationPending = false;
+let loginConfirmationPending = false;
 let resendConfirmationAvailableAt = 0;
 let resendConfirmationTimer = null;
+let showResendConfirmation = false;
 let initialSessionResolved = false;
 let pendingProfileAvatar = "";
 let betaApproved = false;
@@ -131,6 +178,14 @@ let devAccessApproved = false;
 let betaAccessExpiresAt = "";
 let devAccessExpiresAt = "";
 let betaModeRequested = false;
+let subscriptionPlan = "free";
+let billingStatus = {
+  plan: "guest",
+  paid: false,
+  billingConfigured: false,
+  testMode: false,
+  subscriptionStatus: null
+};
 
 let supabasePromise = null;
 let cloudSyncTimer = null;
@@ -147,6 +202,10 @@ const STREAM_PAINT_INTERVAL = 80;
 const MESSAGE_CHECKPOINT_INTERVAL = 1500;
 const CLOUD_SYNC_DELAY = 1000;
 const CLOUD_PULL_INTERVAL = 5000;
+const VOICE_SILENCE_MS = 1050;
+const VOICE_WAIT_FOR_SPEECH_MS = 8500;
+const VOICE_MAX_TURN_MS = 30_000;
+const VOICE_ACTIVITY_THRESHOLD = 0.018;
 
 const DOM = {
   app: byId("app"),
@@ -167,9 +226,10 @@ const DOM = {
   chatList: byId("chatList"),
   chatListSentinel: byId("chatListSentinel"),
   chatSearchInput: byId("chatSearchInput"),
+  chatFolderFilter: byId("chatFolderFilter"),
+  newFolderBtn: byId("newFolderBtn"),
+  deleteFolderBtn: byId("deleteFolderBtn"),
   loginBtn: byId("loginBtn"),
-  modeSelect: byId("modeSelect"),
-  betaModeOption: byId("betaModeOption"),
   modelSelect: byId("modelSelect"),
   compareBtn: byId("compareBtn"),
   compareBar: byId("compareBar"),
@@ -183,10 +243,12 @@ const DOM = {
   voiceBtn: byId("voiceBtn"),
   memoryBtn: byId("memoryBtn"),
   supportBtn: byId("supportBtn"),
+  plansBtn: byId("plansBtn"),
   supportDialog: byId("supportDialog"),
   settingsBtn: byId("settingsBtn"),
   themeBtn: byId("themeBtn"),
   clearChatBtn: byId("clearChatBtn"),
+  incognitoBtn: byId("incognitoBtn"),
   messageCounter: byId("messageCounter"),
   visitorCount: byId("visitorCount"),
   memoryCount: byId("memoryCount"),
@@ -198,6 +260,7 @@ const DOM = {
   imageInput: byId("imageInput"),
   fileInput: byId("fileInput"),
   folderInput: byId("folderInput"),
+  memoryImportInput: byId("memoryImportInput"),
   attachmentTray: byId("attachmentTray"),
   dropOverlay: byId("dropOverlay"),
   toastRegion: byId("toastRegion"),
@@ -210,6 +273,9 @@ const DOM = {
   authEyebrow: byId("authEyebrow"),
   authTitle: byId("authTitle"),
   authIntro: byId("authIntro"),
+  authGoogleBtn: byId("authGoogleBtn"),
+  authProviderSection: byId("authProviderSection"),
+  authSwitchText: byId("authSwitchText"),
   signInTab: byId("signInTab"),
   signUpTab: byId("signUpTab"),
   authEmail: byId("authEmail"),
@@ -233,6 +299,18 @@ const DOM = {
   profileLogoutBtn: byId("profileLogoutBtn"),
   profileSaveBtn: byId("profileSaveBtn"),
   profileDashboard: byId("profileDashboard"),
+  profilePlansBtn: byId("profilePlansBtn"),
+  profileBillingBtn: byId("profileBillingBtn"),
+  profilePreferencesBtn: byId("profilePreferencesBtn"),
+  profilePasswordResetBtn: byId("profilePasswordResetBtn"),
+  profileSyncBtn: byId("profileSyncBtn"),
+  profileDownloadBtn: byId("profileDownloadBtn"),
+  profileAccountStatus: byId("profileAccountStatus"),
+  plansDialog: byId("plansDialog"),
+  plansDialogStatus: byId("plansDialogStatus"),
+  billingTestMode: byId("billingTestMode"),
+  plansError: byId("plansError"),
+  manageBillingBtn: byId("manageBillingBtn"),
   passwordResetDialog: byId("passwordResetDialog"),
   passwordResetForm: byId("passwordResetForm"),
   newPassword: byId("newPassword"),
@@ -255,7 +333,21 @@ const DOM = {
   confirmSubmitBtn: byId("confirmSubmitBtn"),
   confirmCancelBtn: byId("confirmCancelBtn"),
   confirmCancelX: byId("confirmCancelX"),
-  toolsPopover: byId("toolsPopover")
+  toolsPopover: byId("toolsPopover"),
+  voiceDialog: byId("voiceDialog"),
+  voiceOrb: byId("voiceOrb"),
+  voiceLiveIndicator: byId("voiceLiveIndicator"),
+  voiceModelName: byId("voiceModelName"),
+  voiceSelect: byId("voiceSelect"),
+  voiceStatus: byId("voiceStatus"),
+  voiceCaption: byId("voiceCaption"),
+  voiceTranscript: byId("voiceTranscript"),
+  voiceAutoSend: byId("voiceAutoSend"),
+  voiceSpeakReplies: byId("voiceSpeakReplies"),
+  voicePermissionBtn: byId("voicePermissionBtn"),
+  voiceStartBtn: byId("voiceStartBtn"),
+  voiceSendBtn: byId("voiceSendBtn"),
+  voiceEndBtn: byId("voiceEndBtn")
 };
 
 let appInitialized = false;
@@ -277,8 +369,16 @@ function startApp() {
 }
 
 async function init() {
+  if (await isLikelyPrivateBrowsing()) {
+    blockPrivateBrowsing();
+    return;
+  }
+
   normalizeState();
+  importSharedChatFromUrl();
   bindEvents();
+  refreshAuthProviderAvailability();
+  setupVoicePicker();
   applyPreferences();
   updateShortcutLabels();
   updateNetworkStatus();
@@ -295,8 +395,10 @@ async function init() {
 
   await restoreSession();
   await refreshBetaAccess();
+  await refreshBillingAccess({ forceRefresh: hasSuccessfulBillingReturn() });
   syncCompareModelPicker();
   updateAccount();
+  handleBillingReturn();
   handleRequestedAuthMode();
   handleRequestedBetaMode();
 
@@ -305,10 +407,38 @@ async function init() {
   else setTimeout(preloadMarkdown, 1200);
 }
 
+function blockPrivateBrowsing() {
+  const blocker = document.createElement("main");
+  blocker.className = "privateBrowsingBlocker";
+  blocker.setAttribute("role", "alert");
+
+  const mark = document.createElement("span");
+  mark.className = "privateBrowsingMark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "T";
+
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Private browsing blocked";
+
+  const title = document.createElement("h1");
+  title.textContent = "Open Talkaton in a normal browser window.";
+
+  const detail = document.createElement("p");
+  detail.textContent = "Private or incognito browser tabs are not supported because they can reset guest limits. Your normal window can still use Talkaton’s private Incognito chats.";
+
+  blocker.append(mark, eyebrow, title, detail);
+  DOM.app.setAttribute("inert", "");
+  DOM.app.setAttribute("aria-hidden", "true");
+  document.body.classList.add("privateBrowsingBlocked");
+  document.body.append(blocker);
+}
+
 function getUserTier() {
   if (state.loggedIn && state.user?.email) {
     const role = getAccountRole(state.user.email);
     if (role) return role.tier;
+    if (["plus", "pro", "max"].includes(subscriptionPlan)) return subscriptionPlan;
     return "free";
   }
   return "guest";
@@ -319,13 +449,12 @@ function getAccountRole(email = state.user?.email) {
 }
 
 function isUnlimitedTier(tier = getUserTier()) {
-  return tier === "owner" || tier === "support";
+  return tier === "owner" || tier === "owner_alt" || tier === "support";
 }
 
 function canUseModel(model, tier = getUserTier()) {
   if (!MODEL_NAMES[model]) return false;
-  if (tier === "guest") return model === defaultState.model;
-  if (tier === "free" && !betaApproved) return FREE_MODELS.has(model);
+  if (["guest", "free"].includes(tier)) return model === "ollama/default";
   return true;
 }
 
@@ -340,14 +469,22 @@ function getRequestPlan() {
 
 function getTierLabel(tier = getUserTier()) {
   if (tier === "owner") return "Owner";
+  if (tier === "owner_alt") return "Owner Alt Acount";
   if (tier === "support") return "Support";
+  if (tier === "plus") return "Talkaton Plus";
+  if (tier === "pro") return "Talkaton Pro";
+  if (tier === "max") return "Talkaton Max";
   if (tier === "free") return "Free plan";
   return "Guest plan";
 }
 
 function getTierDescription(tier = getUserTier()) {
   if (tier === "owner") return "Full owner access · unlimited";
+  if (tier === "owner_alt") return "Alternate owner access · unlimited";
   if (tier === "support") return "Support access · unlimited";
+  if (tier === "plus") return "1,500 premium messages/day · Ollama backup after";
+  if (tier === "pro") return "5,000 premium messages/day · Ollama backup after";
+  if (tier === "max") return "10,000 premium messages/day · Ollama backup after";
   if (tier === "free") return "Standard access";
   return "Limited access";
 }
@@ -355,8 +492,8 @@ function getTierDescription(tier = getUserTier()) {
 function getDailyLimit() {
   const tier = getUserTier();
   if (isUnlimitedTier(tier) || devAccessApproved) return Infinity;
-  if (betaApproved) return CONFIG.BETA_DAILY_LIMITS.messages;
-  return CONFIG.DAILY_LIMITS[tier];
+  const baseLimit = CONFIG.DAILY_LIMITS[tier] ?? CONFIG.DAILY_LIMITS.free;
+  return betaApproved ? Math.max(baseLimit, CONFIG.BETA_DAILY_LIMITS.messages) : baseLimit;
 }
 
 function resetDailyIfNewDay() {
@@ -370,7 +507,7 @@ function resetDailyIfNewDay() {
 
 function canSendMessage() {
   resetDailyIfNewDay();
-  return state.dailyMessageCount < getDailyLimit();
+  return PAID_TIERS.has(getUserTier()) || state.dailyMessageCount < getDailyLimit();
 }
 
 function incrementDailyCount() {
@@ -390,8 +527,8 @@ function getRemainingMessages() {
 function getImageDailyLimit() {
   const tier = getUserTier();
   if (isUnlimitedTier(tier) || devAccessApproved) return Infinity;
-  if (betaApproved) return CONFIG.BETA_DAILY_LIMITS.images;
-  return CONFIG.IMAGE_DAILY_LIMITS[tier];
+  const baseLimit = CONFIG.IMAGE_DAILY_LIMITS[tier] ?? CONFIG.IMAGE_DAILY_LIMITS.free;
+  return betaApproved ? Math.max(baseLimit, CONFIG.BETA_DAILY_LIMITS.images) : baseLimit;
 }
 
 function resetImageDailyIfNewDay() {
@@ -424,8 +561,8 @@ function getRemainingImages() {
 function getSearchDailyLimit() {
   const tier = getUserTier();
   if (isUnlimitedTier(tier) || devAccessApproved) return Infinity;
-  if (betaApproved) return CONFIG.BETA_DAILY_LIMITS.searches;
-  return CONFIG.SEARCH_DAILY_LIMITS[tier];
+  const baseLimit = CONFIG.SEARCH_DAILY_LIMITS[tier] ?? CONFIG.SEARCH_DAILY_LIMITS.free;
+  return betaApproved ? Math.max(baseLimit, CONFIG.BETA_DAILY_LIMITS.searches) : baseLimit;
 }
 
 function resetSearchDailyIfNewDay() {
@@ -491,9 +628,24 @@ function detectImageIntent(text) {
 function normalizeState() {
   state.loading = false;
   state.settings = { ...defaultState.settings, ...(state.settings || {}) };
+  state.settings.chatFolders = Array.isArray(state.settings.chatFolders)
+    ? state.settings.chatFolders
+      .filter(folder => folder && typeof folder.name === "string")
+      .map(folder => ({
+        id: String(folder.id || createId("folder")),
+        name: folder.name.trim().slice(0, 40) || "Folder",
+        createdAt: Number(folder.createdAt || Date.now())
+      }))
+    : [];
+  state.settings.activeFolderId = String(state.settings.activeFolderId || "all");
+  if (
+    !["all", "unfiled"].includes(state.settings.activeFolderId)
+    && !state.settings.chatFolders.some(folder => folder.id === state.settings.activeFolderId)
+  ) {
+    state.settings.activeFolderId = "all";
+  }
   state.model = MODEL_ALIASES[state.model] || state.model;
   if (!MODEL_NAMES[state.model]) state.model = defaultState.model;
-  if (!RESPONSE_MODES.has(state.mode)) state.mode = defaultState.mode;
   state.chats = (state.chats || []).map(chat => ({
     id: chat.id || createId("chat"),
     title: chat.title || "New chat",
@@ -501,6 +653,8 @@ function normalizeState() {
     updatedAt: chat.updatedAt || chat.createdAt || Date.now(),
     pinned: Boolean(chat.pinned),
     favorite: Boolean(chat.favorite),
+    folderId: String(chat.folderId || ""),
+    incognito: Boolean(chat.incognito),
     messages: Array.isArray(chat.messages)
       ? chat.messages.map(message => ({
         id: message.id || createId("message"),
@@ -511,12 +665,15 @@ function normalizeState() {
         status: message.status === "streaming" ? "stopped" : (message.status || "complete"),
         attachments: Array.isArray(message.attachments) ? message.attachments : [],
         generatedImage: message.generatedImage || "",
+        imagePrompt: String(message.imagePrompt || "").slice(0, 4000),
         comparisonId: message.comparisonId || "",
-        comparisonLabel: message.comparisonLabel || ""
+        comparisonLabel: message.comparisonLabel || "",
+        agentName: String(message.agentName || "").slice(0, 60)
       }))
       : []
   }));
   state.chats = dedupeChatsById(state.chats);
+  incognitoMode = Boolean(getChat()?.incognito);
 
   if (!state.chats.length) {
     const chat = makeChat();
@@ -544,6 +701,7 @@ function bindEvents() {
   DOM.voiceBtn.addEventListener("click", toggleVoiceInput);
   DOM.memoryBtn.addEventListener("click", openMemory);
   DOM.memoryContent.addEventListener("click", handleMemoryAction);
+  DOM.plansBtn.addEventListener("click", openPlans);
   DOM.supportBtn.addEventListener("click", () => {
     const dialog = byId("supportDialog");
     if (dialog && !dialog.open) dialog.showModal();
@@ -560,31 +718,48 @@ function bindEvents() {
   DOM.fileInput.addEventListener("change", event => addFiles(event.target.files));
   DOM.folderInput.addEventListener("change", event => addFolder(event.target.files));
   DOM.chatSearchInput.addEventListener("input", scheduleChatSearchRender);
+  DOM.chatFolderFilter.addEventListener("change", event => {
+    state.settings.activeFolderId = event.target.value;
+    persist();
+    renderChats();
+  });
+  DOM.newFolderBtn.addEventListener("click", createChatFolder);
+  DOM.deleteFolderBtn.addEventListener("click", deleteSelectedChatFolder);
+  DOM.incognitoBtn.addEventListener("click", toggleIncognitoMode);
+  byId("popoverIncognito").addEventListener("click", () => {
+    hideToolsPopover();
+    toggleIncognitoMode();
+  });
+  DOM.memoryImportInput.addEventListener("change", importMemoryFile);
+  DOM.voiceTranscript.addEventListener("input", () => {
+    updateVoiceControls();
+    DOM.voiceCaption.textContent = DOM.voiceTranscript.value.trim() || "Tap Start, then just talk.";
+  });
+  DOM.voiceOrb.addEventListener("click", toggleVoiceRecognition);
+  DOM.voiceSelect.addEventListener("change", () => {
+    state.settings.voiceURI = DOM.voiceSelect.value;
+    persist();
+  });
+  DOM.voicePermissionBtn.addEventListener("click", requestVoiceMicrophonePermission);
+  DOM.voiceStartBtn.addEventListener("click", toggleVoiceRecognition);
+  DOM.voiceSendBtn.addEventListener("click", sendVoiceTranscript);
+  DOM.voiceEndBtn.addEventListener("click", () => DOM.voiceDialog.close());
+  DOM.voiceAutoSend.addEventListener("change", () => {
+    if (!DOM.voiceAutoSend.checked && voiceConversationActive) endVoiceConversation();
+    updateVoiceControls();
+  });
+  DOM.voiceDialog.addEventListener("close", () => endVoiceConversation({ updateStatus: false }));
 
   DOM.input.addEventListener("input", () => {
     scheduleTextareaResize();
     updateComposerState();
   });
   DOM.input.addEventListener("keydown", handleComposerKeydown);
-  DOM.modeSelect.addEventListener("change", event => {
-    if (event.target.value === "Beta Lab" && !betaApproved) {
-      event.target.value = state.mode === "Beta Lab" ? defaultState.mode : state.mode;
-      toast("Beta Lab requires approval. Request access from the Beta page.", "error");
-      return;
-    }
-    state.mode = event.target.value;
-    persist();
-  });
   DOM.modelSelect.addEventListener("change", event => {
     const tier = getUserTier();
-    if (tier === "guest") {
-      event.target.value = "openai/gpt-5.4-nano";
-      toast("Guest accounts are limited to GPT-5.4 Nano. Sign up for more models.", "error");
-      return;
-    }
-    if (tier === "free" && !betaApproved && !FREE_MODELS.has(event.target.value)) {
+    if (!canUseModel(event.target.value, tier)) {
       event.target.value = state.model;
-      toast("Free plan includes GPT-5.4 Nano, DeepSeek, Llama 3.1 8B, and Mistral Small. Beta members unlock all models.", "error");
+      toast("Free and Guest accounts use Ollama.", "error");
       return;
     }
     state.model = event.target.value;
@@ -643,6 +818,8 @@ function bindEvents() {
   byId("speechRateInput").addEventListener("input", saveSettingsFromDialog);
 
   DOM.authForm.addEventListener("submit", submitAuth);
+  DOM.authGoogleBtn.addEventListener("click", startGoogleRedirectSignIn);
+  DOM.authDialog.addEventListener("close", resetClosedAuthDialog);
   DOM.signInTab.addEventListener("click", () => setAuthMode("signIn"));
   DOM.signUpTab.addEventListener("click", () => setAuthMode("signUp"));
   DOM.forgotPasswordBtn.addEventListener("click", requestPasswordReset);
@@ -652,6 +829,23 @@ function bindEvents() {
   DOM.profileImageInput.addEventListener("change", handleProfileImageSelection);
   DOM.profileRemoveBtn.addEventListener("click", removeProfileImage);
   DOM.profileLogoutBtn.addEventListener("click", logoutFromProfile);
+  DOM.profilePlansBtn.addEventListener("click", () => {
+    closeDialog(DOM.profileDialog);
+    openPlans();
+  });
+  DOM.profileBillingBtn.addEventListener("click", openPlans);
+  DOM.profilePreferencesBtn.addEventListener("click", () => {
+    closeDialog(DOM.profileDialog);
+    openPreferenceSettings();
+  });
+  DOM.profilePasswordResetBtn.addEventListener("click", sendProfilePasswordReset);
+  DOM.profileSyncBtn.addEventListener("click", syncAccountNow);
+  DOM.profileDownloadBtn.addEventListener("click", downloadAccountData);
+  DOM.manageBillingBtn.addEventListener("click", openPlans);
+  DOM.plansDialog.addEventListener("click", event => {
+    const button = event.target.closest("[data-subscribe-plan]");
+    if (button) openPlans();
+  });
   DOM.profileUsername.addEventListener("input", () => {
     renderProfileAvatar(DOM.profileUsername.value.trim() || getProfileName(state.user));
   });
@@ -699,14 +893,16 @@ function bindEvents() {
   DOM.input.addEventListener("paste", handlePaste);
 }
 
-function makeChat() {
+function makeChat({ incognito = false, folderId = "" } = {}) {
   return {
     id: createId("chat"),
-    title: "New chat",
+    title: incognito ? "Incognito chat" : "New chat",
     createdAt: Date.now(),
     updatedAt: Date.now(),
     pinned: false,
     favorite: false,
+    folderId,
+    incognito,
     messages: []
   };
 }
@@ -727,13 +923,15 @@ function getChat() {
 function createChat() {
   if (state.loading) stopGeneration();
   const activeChat = getChat();
-  if (activeChat?.messages.length === 0) {
+  if (activeChat?.messages.length === 0 && Boolean(activeChat.incognito) === incognitoMode) {
     DOM.input.focus();
     closeMobileSidebar();
     return;
   }
 
-  const chat = makeChat();
+  const activeFolder = state.settings.activeFolderId;
+  const folderId = ["all", "unfiled"].includes(activeFolder) ? "" : activeFolder;
+  const chat = makeChat({ incognito: incognitoMode, folderId });
   state.chats.unshift(chat);
   state.currentChatId = chat.id;
   state.pendingAttachments = [];
@@ -744,6 +942,7 @@ function createChat() {
   renderChats();
   renderMessages();
   renderAttachmentTray();
+  updateIncognitoUi();
   updateComposerState();
   closeMobileSidebar();
   DOM.input.focus();
@@ -769,13 +968,8 @@ async function sendMessage(options = {}) {
     return sendSearchMessage(text);
   }
 
-  if (getUserTier() === "guest" && state.model !== "openai/gpt-5.4-nano") {
-    state.model = "openai/gpt-5.4-nano";
-    DOM.modelSelect.value = state.model;
-  }
-
-  if (getUserTier() === "free" && !betaApproved && !FREE_MODELS.has(state.model)) {
-    state.model = "openai/gpt-5.4-nano";
+  if (!canUseModel(state.model)) {
+    state.model = defaultState.model;
     DOM.modelSelect.value = state.model;
   }
 
@@ -806,7 +1000,7 @@ async function sendMessage(options = {}) {
     resizeTextarea();
   }
 
-  if (chat.title === "New chat" && !options.hiddenUser) {
+  if ((chat.title === "New chat" || chat.title === "Incognito chat") && !options.hiddenUser) {
     chat.title = createChatTitle(text);
   }
 
@@ -844,7 +1038,7 @@ async function sendMessage(options = {}) {
     try {
       const response = await fetch(CONFIG.SEARCH_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getChatRequestHeaders(),
         signal: abortController.signal,
         body: JSON.stringify({ query: searchQuery })
       });
@@ -885,10 +1079,11 @@ async function sendMessage(options = {}) {
     const imageIndicator = {
       id: createId("message"),
       role: "assistant",
-      content: "Creating your image\u2026",
+      content: "",
       timestamp: Date.now(),
       model: "gpt-image-1-mini",
       status: "streaming",
+      imagePrompt,
       attachments: []
     };
     chat.messages.push(imageIndicator);
@@ -899,7 +1094,7 @@ async function sendMessage(options = {}) {
     try {
       const imageResponse = await fetch(CONFIG.IMAGE_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getChatRequestHeaders(),
         signal: abortController.signal,
         body: JSON.stringify({ prompt: imagePrompt })
       });
@@ -911,8 +1106,9 @@ async function sendMessage(options = {}) {
       if (!url) throw new Error("Image generation returned no image.");
 
       imageIndicator.generatedImage = url;
-      imageIndicator.model = imageData?.model || "gpt-image-1-mini";
-      imageIndicator.content = `Created from: "${imagePrompt}"`;
+      imageIndicator.model = getImageResponseModel(imageData);
+      imageIndicator.content = getImageResponseText(imageData);
+      imageIndicator.imagePrompt = "";
       imageIndicator.status = "complete";
       persistChatChange();
       incrementImageDailyCount();
@@ -920,6 +1116,7 @@ async function sendMessage(options = {}) {
       imageIndicator.status = error.name === "AbortError" ? "stopped" : "error";
       imageIndicator.error = error.message || "Image generation failed.";
       imageIndicator.content = "";
+      imageIndicator.imagePrompt = "";
     }
 
     state.loading = false;
@@ -957,6 +1154,8 @@ async function sendMessage(options = {}) {
   try {
     const history = options.historyOverride
       || createHistory(chat, assistantMessage.id, Boolean(options.targetMessage));
+    const activeAgent = globalThis.TalkatonProductivity?.getActiveAgent?.() || null;
+    if (activeAgent?.name) assistantMessage.agentName = String(activeAgent.name).slice(0, 60);
     const requestHeaders = await getChatRequestHeaders();
     const response = await fetch(CONFIG.CHAT_API, {
       method: "POST",
@@ -965,11 +1164,11 @@ async function sendMessage(options = {}) {
       body: JSON.stringify({
         message: text,
         model: requestModel,
-        mode: state.mode,
         plan: getRequestPlan(),
         timeZone: getClientTimeZone(),
         history,
         memory: state.settings.memory ? state.memory.slice(-8) : [],
+        agent: activeAgent,
         attachments: attachments.map(attachment => ({
           name: attachment.name,
           type: attachment.type,
@@ -1030,50 +1229,56 @@ async function consumeEventStream(body, assistantMessage) {
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      buffer += decoder.decode();
+      break;
+    }
     buffer += decoder.decode(value, { stream: true });
     const events = buffer.split(/\r?\n\r?\n/);
     buffer = events.pop() || "";
 
     for (const event of events) {
-      const dataLines = event.split("\n")
-        .filter(line => line.startsWith("data:"))
-        .map(line => line.slice(5).trim());
-
-      for (const dataLine of dataLines) {
-        if (!dataLine || dataLine === "[DONE]") continue;
-        let payload;
-        try {
-          payload = JSON.parse(dataLine);
-        } catch {
-          continue;
-        }
-
-        if (payload.error) throw new Error(payload.error.message || "The model stream failed.");
-        const token = payload.choices?.[0]?.delta?.content;
-        if (typeof token === "string" && token) {
-          assistantMessage.content += token;
-          assistantMessage.model = payload.model || assistantMessage.model;
-          checkpointMessages();
-          scheduleStreamingRender(assistantMessage);
-        }
-      }
+      consumeChatSseEvent(event, assistantMessage);
     }
   }
 
-  if (buffer.trim().startsWith("data:")) {
-    const line = buffer.trim().slice(5).trim();
-    if (line !== "[DONE]") {
-      try {
-        const payload = JSON.parse(line);
-        const token = payload.choices?.[0]?.delta?.content;
-        if (typeof token === "string") {
-          assistantMessage.content += token;
-          checkpointMessages({ immediate: true });
-        }
-      } catch {}
-    }
+  if (buffer.trim()) consumeChatSseEvent(buffer, assistantMessage, true);
+}
+
+function consumeChatSseEvent(event, assistantMessage, immediate = false) {
+  const data = event.split(/\r?\n/)
+    .filter(line => line.startsWith("data:"))
+    .map(line => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+  if (!data || data === "[DONE]") return;
+  let payload;
+  try {
+    payload = JSON.parse(data);
+  } catch {
+    return;
   }
+  if (payload.error) throw new Error(payload.error.message || payload.message || "The model stream failed.");
+  const token = extractChatStreamText(payload);
+  if (!token) return;
+  assistantMessage.content += token;
+  assistantMessage.model = payload.model || assistantMessage.model;
+  checkpointMessages(immediate ? { immediate: true } : undefined);
+  if (!immediate) scheduleStreamingRender(assistantMessage);
+}
+
+function extractChatStreamText(payload) {
+  const content = payload?.choices?.[0]?.delta?.content
+    ?? payload?.choices?.[0]?.message?.content
+    ?? payload?.output_text
+    ?? payload?.response?.output_text;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map(part => {
+    if (typeof part === "string") return part;
+    if (!part || typeof part !== "object") return "";
+    return ["text", "output_text"].includes(part.type) && typeof part.text === "string" ? part.text : "";
+  }).join("");
 }
 
 function stopGeneration() {
@@ -1155,7 +1360,7 @@ async function sendSearchMessage(text) {
     attachments: []
   };
   chat.messages.push(userMessage, assistantMessage);
-  if (chat.title === "New chat") chat.title = createChatTitle(text);
+  if (chat.title === "New chat" || chat.title === "Incognito chat") chat.title = createChatTitle(text);
   DOM.input.value = "";
   searchMode = false;
   state.loading = true;
@@ -1168,7 +1373,7 @@ async function sendSearchMessage(text) {
   try {
     const response = await fetch(CONFIG.SEARCH_API, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getChatRequestHeaders(),
       signal: abortController.signal,
       body: JSON.stringify({ query: text })
     });
@@ -1208,6 +1413,18 @@ function getGeneratedImageSource(image) {
       ? "image/png"
       : "image/webp";
   return `data:${mimeType};base64,${image.b64_json}`;
+}
+
+function getImageResponseText(data) {
+  const text = String(data?.commentary || "").trim();
+  return text || "Your image is ready.";
+}
+
+function getImageResponseModel(data) {
+  const imageModel = String(data?.model || "gpt-image-1-mini");
+  return data?.commentary_provider === "openrouter"
+    ? `${imageModel} + OpenRouter`
+    : imageModel;
 }
 
 function getGeneratedImageExtension(source) {
@@ -1255,10 +1472,11 @@ async function generateImage() {
   const assistant = {
     id: createId("message"),
     role: "assistant",
-    content: "Creating your image…",
+    content: "",
     timestamp: Date.now(),
     model: "gpt-image-1-mini",
     status: "streaming",
+    imagePrompt: prompt,
     attachments: []
   };
 
@@ -1271,7 +1489,7 @@ async function generateImage() {
   try {
     const response = await fetch(CONFIG.IMAGE_API, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await getChatRequestHeaders(),
       signal: abortController.signal,
       body: JSON.stringify({ prompt })
     });
@@ -1284,8 +1502,9 @@ async function generateImage() {
 
     if (!assistant.generatedImage) throw new Error("Image generation returned no image.");
 
-    assistant.model = data?.model || "gpt-image-1-mini";
-    assistant.content = `Created from: "${prompt}"`;
+    assistant.model = getImageResponseModel(data);
+    assistant.content = getImageResponseText(data);
+    assistant.imagePrompt = "";
     assistant.status = "complete";
     persistChatChange();
     incrementImageDailyCount();
@@ -1293,6 +1512,7 @@ async function generateImage() {
     assistant.status = error.name === "AbortError" ? "stopped" : "error";
     assistant.error = error.message || "Image generation failed.";
     assistant.content = "";
+    assistant.imagePrompt = "";
   } finally {
     state.loading = false;
     abortController = null;
@@ -1305,6 +1525,7 @@ async function generateImage() {
 
 function renderMessages(options = {}) {
   const chat = getChat();
+  updateIncognitoUi();
   const previousScrollTop = DOM.chatViewport.scrollTop;
   const sameChat = DOM.chatArea.dataset.chatId === chat?.id;
   const isEmpty = !chat?.messages.length;
@@ -1389,8 +1610,10 @@ function messageElementNeedsUpdate(article, message) {
     || previous.model !== message.model
     || previous.error !== message.error
     || previous.generatedImage !== message.generatedImage
+    || previous.imagePrompt !== message.imagePrompt
     || previous.comparisonId !== message.comparisonId
     || previous.comparisonLabel !== message.comparisonLabel
+    || previous.agentName !== message.agentName
     || previous.searchResults !== message.searchResults
     || previous.attachments !== message.attachments
     || previous.timestampsEnabled !== state.settings.timestamps
@@ -1405,8 +1628,10 @@ function captureMessageRenderState(message) {
     model: message.model,
     error: message.error,
     generatedImage: message.generatedImage,
+    imagePrompt: message.imagePrompt,
     comparisonId: message.comparisonId,
     comparisonLabel: message.comparisonLabel,
+    agentName: message.agentName,
     searchResults: message.searchResults,
     attachments: message.attachments,
     timestampsEnabled: state.settings.timestamps,
@@ -1441,9 +1666,12 @@ function createMessageElement(message, index, { animate = true } = {}) {
   const inner = element("div", "messageInner");
   const header = element("header", "messageHeader");
   const identity = element("div", "messageIdentity");
-  identity.innerHTML = isUser
-    ? `<span class="messageAvatar userAvatar" aria-hidden="true">Y</span><strong>You</strong>`
-    : `<span class="messageAvatar assistantAvatar" aria-hidden="true">T</span><strong>Talkaton</strong>`;
+  const avatar = element("span", `messageAvatar ${isUser ? "userAvatar" : "assistantAvatar"}`);
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.textContent = isUser ? "Y" : "T";
+  const identityName = document.createElement("strong");
+  identityName.textContent = isUser ? "You" : message.agentName || "Talkaton";
+  identity.append(avatar, identityName);
   header.append(identity);
 
   if (!isUser && message.comparisonLabel) {
@@ -1461,7 +1689,9 @@ function createMessageElement(message, index, { animate = true } = {}) {
 
   const body = element("div", "messageContent");
 
-  if (message.status === "streaming" && !message.content) {
+  if (message.status === "streaming" && message.imagePrompt) {
+    body.append(createImageGenerationProgress(message.imagePrompt));
+  } else if (message.status === "streaming" && !message.content) {
     body.append(createTypingIndicator());
   } else if (message.content) {
     body.textContent = message.content;
@@ -1481,12 +1711,28 @@ function createMessageElement(message, index, { animate = true } = {}) {
     image.loading = "lazy";
     image.decoding = "async";
     const caption = element("figcaption", "generatedImageActions");
-    const download = element("a", "generatedImageDownload");
+    const download = element("button", "generatedImageDownload");
+    download.type = "button";
     const extension = getGeneratedImageExtension(message.generatedImage);
-    download.href = message.generatedImage;
-    download.download = `${slugify(getChat()?.title || "talkaton-image")}-${String(message.id).slice(-8)}.${extension}`;
+    const fileName = `${slugify(getChat()?.title || "talkaton-image")}-${String(message.id).slice(-8)}.${extension}`;
     download.textContent = "Download image ↓";
     download.setAttribute("aria-label", "Download this generated image");
+    download.addEventListener("click", async () => {
+      download.disabled = true;
+      download.textContent = "Downloading…";
+      try {
+        await downloadResource(message.generatedImage, fileName);
+        download.textContent = "Downloaded ✓";
+      } catch (error) {
+        download.textContent = "Try again";
+        toast(error?.message || "The image could not be downloaded.", "error");
+      } finally {
+        setTimeout(() => {
+          download.disabled = false;
+          download.textContent = "Download image ↓";
+        }, 1600);
+      }
+    });
     caption.append(download);
     figure.append(image, caption);
     inner.append(figure);
@@ -1566,6 +1812,30 @@ function createTypingIndicator() {
   return indicator;
 }
 
+function createImageGenerationProgress(prompt) {
+  const progress = element("div", "imageGenerationProgress");
+  progress.setAttribute("role", "status");
+  progress.setAttribute("aria-live", "polite");
+  progress.setAttribute("aria-label", "Talkaton is creating your image");
+
+  const preview = element("div", "imageGenerationPreview");
+  preview.setAttribute("aria-hidden", "true");
+  preview.innerHTML = "<span></span><span></span><span></span>";
+
+  const details = element("div", "imageGenerationDetails");
+  const eyebrow = element("span", "imageGenerationEyebrow");
+  eyebrow.textContent = "Image Studio";
+  const title = document.createElement("strong");
+  title.textContent = "Creating your image";
+  const description = document.createElement("p");
+  description.textContent = "Composing the scene, rendering details, and preparing the final image.";
+  const promptPreview = element("span", "imageGenerationPrompt");
+  promptPreview.textContent = String(prompt || "").slice(0, 180);
+  details.append(eyebrow, title, description, promptPreview);
+  progress.append(preview, details);
+  return progress;
+}
+
 function createErrorState(message) {
   const error = element("div", "messageError");
   error.setAttribute("role", "alert");
@@ -1609,7 +1879,7 @@ async function renderMessageBody(container, content, streaming = false) {
 }
 
 function loadMarkdown() {
-  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20260728-model-compare19");
+  if (!markdownModulePromise) markdownModulePromise = import("../modules/markdown.js?v=20260729-collaboration1");
   return markdownModulePromise;
 }
 
@@ -1802,6 +2072,7 @@ function toggleSpeech(message, button) {
     return;
   }
   const utterance = new SpeechSynthesisUtterance(stripMarkdown(message.content));
+  applySelectedSpeechVoice(utterance);
   utterance.rate = Number(state.settings.speechRate) || 1;
   utterance.onend = utterance.onerror = () => { button.textContent = "Read"; };
   button.textContent = "Stop";
@@ -1811,11 +2082,26 @@ function toggleSpeech(message, button) {
 function downloadMessage(message) {
   const chat = getChat();
   const blob = new Blob([message.content], { type: "text/markdown;charset=utf-8" });
+  triggerBlobDownload(blob, `${slugify(chat?.title || "talkaton-response")}.md`);
+}
+
+async function downloadResource(source, fileName) {
+  const response = await fetch(source, { credentials: "same-origin" });
+  if (!response.ok) throw new Error(`Download failed (${response.status}).`);
+  triggerBlobDownload(await response.blob(), fileName);
+}
+
+function triggerBlobDownload(blob, fileName) {
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${slugify(chat?.title || "talkaton-response")}.md`;
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = fileName;
+  link.rel = "noopener";
+  link.hidden = true;
+  document.body.append(link);
   link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function updateMessageMetrics(article, message) {
@@ -1825,7 +2111,15 @@ function updateMessageMetrics(article, message) {
 
 function renderChats() {
   const query = DOM.chatSearchInput.value.trim().toLowerCase();
+  renderFolderPicker();
+  const activeFolderId = state.settings.activeFolderId;
   const filtered = state.chats
+    .filter(chat => {
+      if (chat.incognito) return chat.id === state.currentChatId;
+      if (activeFolderId === "all") return true;
+      if (activeFolderId === "unfiled") return !chat.folderId;
+      return chat.folderId === activeFolderId;
+    })
     .filter(chat => !query || chat.title.toLowerCase().includes(query) || chat.messages.some(message => message.content.toLowerCase().includes(query)))
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt);
   const visible = filtered.slice(0, visibleChatCount);
@@ -1873,7 +2167,11 @@ function createChatItem(chat) {
   const open = element("button", "chatSelectBtn");
   open.type = "button";
   open.dataset.chatAction = "open";
-  open.innerHTML = `<span>${escapeHtml(chat.title)}</span><small>${formatRelativeTime(chat.updatedAt)}</small>`;
+  const folder = state.settings.chatFolders.find(candidate => candidate.id === chat.folderId);
+  const detail = chat.incognito
+    ? `Incognito · ${formatRelativeTime(chat.updatedAt)}`
+    : `${folder ? `${folder.name} · ` : ""}${formatRelativeTime(chat.updatedAt)}`;
+  open.innerHTML = `<span>${escapeHtml(chat.title)}</span><small>${escapeHtml(detail)}</small>`;
   open.title = chat.title;
 
   const favorite = element("button", `chatIconBtn${chat.favorite ? " selected" : ""}`);
@@ -1894,6 +2192,8 @@ function createChatItem(chat) {
   actions.innerHTML = `
     <button type="button" data-chat-action="pin">${chat.pinned ? "Unpin" : "Pin"}</button>
     <button type="button" data-chat-action="rename">Rename</button>
+    ${chat.incognito ? "" : '<button type="button" data-chat-action="move">Move to folder</button>'}
+    <button type="button" data-chat-action="share">Share chat</button>
     <button type="button" class="dangerAction" data-chat-action="delete">Delete</button>`;
 
   item.append(open, favorite, menu, actions);
@@ -1914,11 +2214,13 @@ async function handleChatListAction(event) {
     case "open":
       if (state.loading) stopGeneration();
       state.currentChatId = chat.id;
+      incognitoMode = Boolean(chat.incognito);
       state.pendingAttachments = [];
       persist();
       renderChats();
       renderMessages();
       renderAttachmentTray();
+      updateIncognitoUi();
       closeMobileSidebar();
       break;
     case "menu":
@@ -1959,6 +2261,12 @@ async function handleChatListAction(event) {
       if (chat.id === state.currentChatId) DOM.conversationTitle.textContent = nextTitle;
       break;
     }
+    case "move":
+      await moveChatToFolder(chat);
+      break;
+    case "share":
+      await shareChat(chat);
+      break;
     case "delete": {
       const confirmed = await askForConfirmation({
         eyebrow: "Delete chat",
@@ -1974,6 +2282,230 @@ async function handleChatListAction(event) {
   }
 }
 
+function renderFolderPicker() {
+  const folders = state.settings.chatFolders;
+  const selected = state.settings.activeFolderId;
+  DOM.chatFolderFilter.replaceChildren(
+    new Option("All chats", "all"),
+    new Option("Unfiled", "unfiled"),
+    ...folders.map(folder => new Option(folder.name, folder.id))
+  );
+  DOM.chatFolderFilter.value = ["all", "unfiled"].includes(selected)
+    || folders.some(folder => folder.id === selected)
+    ? selected
+    : "all";
+  state.settings.activeFolderId = DOM.chatFolderFilter.value;
+  DOM.deleteFolderBtn.disabled = ["all", "unfiled"].includes(DOM.chatFolderFilter.value);
+}
+
+async function createChatFolder() {
+  const name = await askForText({
+    eyebrow: "Folders",
+    title: "Create a chat folder",
+    label: "Folder name",
+    placeholder: "Work, School, Ideas…",
+    submitLabel: "Create"
+  });
+  if (!name) return;
+  const existing = state.settings.chatFolders.find(folder => folder.name.toLowerCase() === name.toLowerCase());
+  const folder = existing || {
+    id: createId("folder"),
+    name: name.slice(0, 40),
+    createdAt: Date.now()
+  };
+  if (!existing) state.settings.chatFolders.push(folder);
+  state.settings.activeFolderId = folder.id;
+  persistChatChange();
+  renderChats();
+  toast(existing ? "Folder opened" : "Folder created");
+}
+
+async function deleteSelectedChatFolder() {
+  const folderId = state.settings.activeFolderId;
+  const folder = state.settings.chatFolders.find(candidate => candidate.id === folderId);
+  if (!folder) return;
+  const confirmed = await askForConfirmation({
+    eyebrow: "Folders",
+    title: `Delete "${folder.name}"?`,
+    message: "The chats will stay in Talkaton and move to Unfiled.",
+    submitLabel: "Delete folder",
+    cancelLabel: "Keep"
+  });
+  if (!confirmed) return;
+  state.settings.chatFolders = state.settings.chatFolders.filter(candidate => candidate.id !== folderId);
+  state.chats.forEach(chat => {
+    if (chat.folderId === folderId) chat.folderId = "";
+  });
+  state.settings.activeFolderId = "all";
+  persistChatChange();
+  renderChats();
+  toast("Folder deleted; chats moved to Unfiled");
+}
+
+async function moveChatToFolder(chat) {
+  const folderNames = state.settings.chatFolders.map(folder => folder.name).join(", ");
+  const current = state.settings.chatFolders.find(folder => folder.id === chat.folderId)?.name || "none";
+  const name = await askForText({
+    eyebrow: "Folders",
+    title: `Move "${chat.title}"`,
+    label: folderNames
+      ? `Folder name (${folderNames}) — type none to unfile`
+      : "Folder name — a new folder will be created",
+    value: current,
+    placeholder: "Work",
+    submitLabel: "Move"
+  });
+  if (!name) return;
+  if (/^(none|unfiled)$/i.test(name)) {
+    chat.folderId = "";
+  } else {
+    let folder = state.settings.chatFolders.find(candidate => candidate.name.toLowerCase() === name.toLowerCase());
+    if (!folder) {
+      folder = { id: createId("folder"), name: name.slice(0, 40), createdAt: Date.now() };
+      state.settings.chatFolders.push(folder);
+    }
+    chat.folderId = folder.id;
+  }
+  chat.updatedAt = Date.now();
+  persistChatChange();
+  renderChats();
+  toast(chat.folderId ? "Chat moved to folder" : "Chat moved to Unfiled");
+}
+
+function toggleIncognitoMode() {
+  if (state.loading) stopGeneration();
+
+  if (incognitoMode) {
+    const leavingId = state.currentChatId;
+    state.chats = state.chats.filter(chat => !chat.incognito);
+    incognitoMode = false;
+    let nextChat = state.chats.find(chat => chat.id !== leavingId);
+    if (!nextChat) {
+      nextChat = makeChat();
+      state.chats.unshift(nextChat);
+    }
+    state.currentChatId = nextChat.id;
+    toast("Incognito ended. That chat was not saved.");
+  } else {
+    incognitoMode = true;
+    const chat = makeChat({ incognito: true });
+    state.chats.unshift(chat);
+    state.currentChatId = chat.id;
+    state.pendingAttachments = [];
+    toast("Incognito is on. This chat will disappear when you leave.");
+  }
+
+  DOM.input.value = "";
+  persistChatChange();
+  renderChats();
+  renderMessages();
+  renderAttachmentTray();
+  updateComposerState();
+  updateIncognitoUi();
+  DOM.input.focus();
+}
+
+function updateIncognitoUi() {
+  const active = Boolean(getChat()?.incognito);
+  incognitoMode = active;
+  DOM.incognitoBtn.classList.toggle("active", active);
+  DOM.incognitoBtn.setAttribute("aria-pressed", String(active));
+  DOM.incognitoBtn.textContent = active ? "Incognito on" : "Incognito";
+  DOM.composer.classList.toggle("incognitoMode", active);
+  DOM.conversationTitle.closest(".conversationHeading")?.classList.toggle("incognitoHeading", active);
+}
+
+async function shareChat(chat) {
+  const messages = chat.messages
+    .filter(message => ["user", "assistant"].includes(message.role) && message.content)
+    .slice(-30)
+    .map(message => ({
+      role: message.role,
+      content: String(message.content).slice(0, 4000),
+      timestamp: message.timestamp,
+      model: message.model || "",
+      comparisonLabel: message.comparisonLabel || ""
+    }));
+
+  if (!messages.length) {
+    toast("Add a message before sharing this chat.", "error");
+    return;
+  }
+
+  const payload = encodeSharedPayload({
+    version: 1,
+    title: chat.title,
+    messages
+  });
+  const url = `${window.location.origin}/chat#share=${payload}`;
+  if (url.length > 28_000) {
+    toast("This chat is too long for one private share link. Download individual responses instead.", "error");
+    return;
+  }
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        title: chat.title,
+        text: "Shared from Talkaton",
+        url
+      });
+    } else {
+      await copyText(url);
+      toast("Private chat link copied");
+    }
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      await copyText(url);
+      toast("Private chat link copied");
+    }
+  }
+}
+
+function encodeSharedPayload(value) {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeSharedPayload(value) {
+  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function importSharedChatFromUrl() {
+  if (!window.location.hash.startsWith("#share=")) return;
+  try {
+    const payload = decodeSharedPayload(window.location.hash.slice(7));
+    if (!Array.isArray(payload.messages) || !payload.messages.length) throw new Error("Empty chat");
+    const chat = makeChat();
+    chat.title = `${String(payload.title || "Shared chat").slice(0, 70)} (shared)`;
+    chat.messages = payload.messages.slice(-30).map(message => ({
+      id: createId("message"),
+      role: message.role === "user" ? "user" : "assistant",
+      content: String(message.content || "").slice(0, 4000),
+      timestamp: Number(message.timestamp || Date.now()),
+      model: String(message.model || ""),
+      status: "complete",
+      attachments: [],
+      comparisonId: "",
+      comparisonLabel: String(message.comparisonLabel || "")
+    }));
+    chat.updatedAt = Date.now();
+    state.chats.unshift(chat);
+    state.currentChatId = chat.id;
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    saveStoredState(state);
+    queueMicrotask(() => toast("Shared chat imported into your history"));
+  } catch {
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    queueMicrotask(() => toast("That shared chat link is invalid or expired.", "error"));
+  }
+}
+
 function closeAllChatMenus(exceptItem) {
   DOM.chatList.querySelectorAll(".chatMenu").forEach(menu => {
     if (!exceptItem || !exceptItem.contains(menu)) menu.hidden = true;
@@ -1982,7 +2514,7 @@ function closeAllChatMenus(exceptItem) {
 
 function deleteChat(chatId) {
   state.chats = state.chats.filter(chat => chat.id !== chatId);
-  if (!state.chats.length) state.chats = [makeChat()];
+  if (!state.chats.length) state.chats = [makeChat({ incognito: incognitoMode })];
   if (!state.chats.some(chat => chat.id === state.currentChatId)) state.currentChatId = state.chats[0].id;
   persistChatChange();
   renderChats();
@@ -2002,7 +2534,7 @@ async function clearConversation() {
   });
   if (confirmation?.toLowerCase() !== "clear") return;
   chat.messages = [];
-  chat.title = "New chat";
+  chat.title = chat.incognito ? "Incognito chat" : "New chat";
   chat.updatedAt = Date.now();
   persistChatChange();
   renderChats();
@@ -2413,55 +2945,643 @@ async function sendModelComparison() {
   }
 }
 
-function toggleVoiceInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    toast("Voice input isn’t supported in this browser.", "error");
+function setupVoicePicker() {
+  if (!("speechSynthesis" in window)) {
+    DOM.voiceSelect.disabled = true;
+    DOM.voiceSelect.replaceChildren(new Option("Voices unavailable", ""));
     return;
   }
 
-  if (recognition) {
-    recognition.stop();
-    recognition = null;
-    DOM.voiceBtn.classList.remove("recording");
-    DOM.voiceBtn.setAttribute("aria-pressed", "false");
+  const refreshVoices = () => populateVoicePicker();
+  refreshVoices();
+  if (typeof speechSynthesis.addEventListener === "function") {
+    speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+  } else {
+    speechSynthesis.onvoiceschanged = refreshVoices;
+  }
+}
+
+function populateVoicePicker() {
+  const voices = speechSynthesis.getVoices()
+    .slice()
+    .sort((first, second) => {
+      if (first.default !== second.default) return first.default ? -1 : 1;
+      return `${first.lang} ${first.name}`.localeCompare(`${second.lang} ${second.name}`);
+    });
+  const selectedVoiceURI = String(state.settings.voiceURI || "");
+  const systemOption = new Option("System voice", "");
+  DOM.voiceSelect.replaceChildren(systemOption);
+
+  voices.forEach(voice => {
+    const option = new Option(
+      `${voice.name} · ${voice.lang}${voice.default ? " · Default" : ""}`,
+      getSpeechVoiceId(voice)
+    );
+    DOM.voiceSelect.append(option);
+  });
+
+  DOM.voiceSelect.disabled = voices.length === 0;
+  DOM.voiceSelect.value = voices.some(voice => getSpeechVoiceId(voice) === selectedVoiceURI)
+    ? selectedVoiceURI
+    : "";
+}
+
+function getSpeechVoiceId(voice) {
+  return String(voice?.voiceURI || `${voice?.name || ""}|${voice?.lang || ""}`);
+}
+
+function getSelectedSpeechVoice() {
+  if (!("speechSynthesis" in window)) return null;
+  const selectedVoiceURI = String(state.settings.voiceURI || "");
+  if (!selectedVoiceURI) return null;
+  return speechSynthesis.getVoices()
+    .find(voice => getSpeechVoiceId(voice) === selectedVoiceURI) || null;
+}
+
+function applySelectedSpeechVoice(utterance) {
+  const selectedVoice = getSelectedSpeechVoice();
+  if (!selectedVoice) return;
+  utterance.voice = selectedVoice;
+  utterance.lang = selectedVoice.lang;
+}
+
+async function toggleVoiceInput() {
+  if (!DOM.voiceDialog.open) DOM.voiceDialog.showModal();
+  DOM.voiceModelName.textContent = MODEL_NAMES[state.model] || "Talkaton";
+  voiceUseRecordedTranscription = canUseRecordedVoiceInput();
+  if (!voiceUseRecordedTranscription && !getSpeechRecognitionConstructor()) {
+    setVoiceStatus("This browser cannot record or recognize speech. Try Chrome, Edge, Safari, or Opera.", true);
+    DOM.voicePermissionBtn.disabled = true;
+    DOM.voiceStartBtn.disabled = true;
+    return;
+  }
+  await refreshMicrophonePermissionState();
+  updateVoiceControls();
+  if (voiceMicrophonePermissionGranted) {
+    setVoiceStatus("Microphone allowed. Start whenever you’re ready.");
+    DOM.voiceCaption.textContent = "Your microphone is ready. Talkaton is not listening yet.";
+  } else {
+    setVoiceStatus("Allow microphone access before starting.");
+    DOM.voiceCaption.textContent = "Talkaton will only listen after you allow access and press Start.";
+  }
+}
+
+function toggleVoiceRecognition() {
+  if (voiceConversationActive) {
+    endVoiceConversation();
+    return;
+  }
+  if (recognition || voiceRecorder) {
+    stopVoiceRecognition();
+    return;
+  }
+  if (!voiceMicrophonePermissionGranted) {
+    requestVoiceMicrophonePermission();
+    return;
+  }
+  if (DOM.voiceAutoSend.checked) beginVoiceConversation();
+  else startVoiceRecognition();
+}
+
+function beginVoiceConversation() {
+  if (!canUseRecordedVoiceInput() && !getSpeechRecognitionConstructor()) {
+    setVoiceStatus("This browser cannot record or recognize speech. Try Chrome, Edge, Safari, or Opera.", true);
+    return;
+  }
+  if (!voiceMicrophonePermissionGranted) {
+    setVoiceStatus("Allow microphone access first, then start the conversation.", true);
+    updateVoiceControls();
+    return;
+  }
+  if (state.loading || voiceSending) {
+    setVoiceStatus("Wait for the current reply to finish, then start the live conversation.");
     return;
   }
 
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = document.documentElement.lang || "en-US";
-  let finalTranscript = DOM.input.value;
+  voiceConversationActive = true;
+  DOM.voiceAutoSend.checked = true;
+  DOM.voiceTranscript.value = "";
+  voiceFinalTranscript = "";
+  DOM.voiceCaption.textContent = "Listening for your first turn…";
+  updateVoiceControls();
+  setVoiceStatus("Starting live conversation…");
+  startVoiceRecognition();
+}
 
-  recognition.onstart = () => {
+function getSpeechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function canUseRecordedVoiceInput() {
+  return Boolean(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
+}
+
+async function refreshMicrophonePermissionState() {
+  if (!navigator.permissions?.query) return;
+  try {
+    const permission = await navigator.permissions.query({ name: "microphone" });
+    voiceMicrophonePermissionGranted = permission.state === "granted";
+    permission.onchange = () => {
+      voiceMicrophonePermissionGranted = permission.state === "granted";
+      updateVoiceControls();
+      if (!voiceMicrophonePermissionGranted && voiceConversationActive) {
+        endVoiceConversation({ updateStatus: false });
+        setVoiceStatus("Microphone access is no longer allowed.", true);
+      }
+    };
+  } catch {
+    // Safari may support microphone access without exposing it through Permissions API.
+  }
+}
+
+async function requestVoiceMicrophonePermission() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setVoiceStatus("This browser cannot request microphone access.", true);
+    return false;
+  }
+
+  DOM.voicePermissionBtn.disabled = true;
+  DOM.voicePermissionBtn.textContent = "Waiting for permission…";
+  setVoiceStatus("Choose Allow in your browser’s microphone prompt.");
+  DOM.voiceCaption.textContent = "Talkaton is requesting microphone access, but is not listening yet.";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(track => track.stop());
+    voiceMicrophonePermissionGranted = true;
+    updateVoiceControls();
+    setVoiceStatus("Microphone allowed. Press Start when you’re ready.");
+    DOM.voiceCaption.textContent = "Permission is ready. Talkaton will not listen until you start.";
+    announce("Microphone permission allowed");
+    return true;
+  } catch (error) {
+    voiceMicrophonePermissionGranted = false;
+    const blocked = error?.name === "NotAllowedError" || error?.name === "SecurityError";
+    setVoiceStatus(
+      blocked
+        ? "Microphone access was not allowed. Enable it in your browser’s site settings, then try again."
+        : "Talkaton could not open your microphone. Check that it is connected and not busy.",
+      true
+    );
+    DOM.voiceCaption.textContent = "No audio is being recorded.";
+    updateVoiceControls();
+    return false;
+  }
+}
+
+function endVoiceConversation({ updateStatus = true } = {}) {
+  voiceConversationActive = false;
+  clearVoiceRestartTimer();
+  stopVoiceRecognition({ cancelled: true });
+  if (voiceSpeechResolver) voiceSpeechResolver();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  DOM.voiceOrb.classList.remove("speaking");
+  DOM.voiceCaption.textContent = "Conversation ended.";
+  updateVoiceControls();
+  if (updateStatus) setVoiceStatus("Live chat ended. Your conversation is saved.");
+  announce("Live chat ended");
+}
+
+function clearVoiceRestartTimer() {
+  if (!voiceRestartTimer) return;
+  clearTimeout(voiceRestartTimer);
+  voiceRestartTimer = null;
+}
+
+function resumeLiveVoiceConversation(delay = 350) {
+  clearVoiceRestartTimer();
+  if (!voiceConversationActive || !DOM.voiceDialog.open) return;
+  voiceRestartTimer = setTimeout(() => {
+    voiceRestartTimer = null;
+    if (!voiceConversationActive || recognition || voiceRecorder || voiceSending || state.loading || !DOM.voiceDialog.open) return;
+    startVoiceRecognition({ skipPermissionCheck: true });
+  }, delay);
+}
+
+async function startVoiceRecognition({ skipPermissionCheck = false } = {}) {
+  if (voiceUseRecordedTranscription && canUseRecordedVoiceInput()) {
+    await startRecordedVoiceTurn({ skipPermissionCheck });
+    return;
+  }
+
+  const SpeechRecognition = getSpeechRecognitionConstructor();
+  if (!SpeechRecognition || recognition || voiceRecorder || voiceSending || state.loading) return;
+
+  if (!skipPermissionCheck && !voiceMicrophonePermissionGranted) {
+    setVoiceStatus("Allow microphone access before starting.", true);
+    updateVoiceControls();
+    return;
+  }
+
+  const instance = new SpeechRecognition();
+  recognition = instance;
+  instance.continuous = false;
+  instance.interimResults = true;
+  instance.maxAlternatives = 1;
+  instance.lang = document.documentElement.lang || navigator.language || "en-US";
+  voiceFinalTranscript = DOM.voiceTranscript.value.trim();
+  let failed = false;
+  let fallbackToRecording = false;
+
+  instance.onstart = () => {
     DOM.voiceBtn.classList.add("recording");
     DOM.voiceBtn.setAttribute("aria-pressed", "true");
-    announce("Voice input started");
+    DOM.voiceOrb.classList.add("listening");
+    DOM.voiceOrb.classList.remove("speaking");
+    updateVoiceControls();
+    setVoiceStatus("Listening… speak naturally.");
+    announce(voiceConversationActive ? "Live chat started" : "Voice input started");
   };
-  recognition.onresult = event => {
+  instance.onresult = event => {
     let interim = "";
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      if (event.results[index].isFinal) finalTranscript += `${finalTranscript ? " " : ""}${event.results[index][0].transcript}`;
+      if (event.results[index].isFinal) {
+        voiceFinalTranscript += `${voiceFinalTranscript ? " " : ""}${event.results[index][0].transcript.trim()}`;
+      }
       else interim += event.results[index][0].transcript;
     }
-    DOM.input.value = `${finalTranscript}${interim ? ` ${interim}` : ""}`;
-    resizeTextarea();
-    updateComposerState();
+    DOM.voiceTranscript.value = `${voiceFinalTranscript}${interim ? ` ${interim.trim()}` : ""}`.trim();
+    DOM.voiceCaption.textContent = DOM.voiceTranscript.value || "Listening…";
+    updateVoiceControls();
   };
-  recognition.onend = () => {
+  instance.onend = () => {
+    if (recognition !== instance) return;
     recognition = null;
     DOM.voiceBtn.classList.remove("recording");
     DOM.voiceBtn.setAttribute("aria-pressed", "false");
+    DOM.voiceOrb.classList.remove("listening");
+    updateVoiceControls();
+    if (fallbackToRecording && voiceConversationActive && DOM.voiceDialog.open) {
+      setVoiceStatus("Switching to Talkaton transcription…");
+      setTimeout(() => startRecordedVoiceTurn({ skipPermissionCheck: true }), 150);
+      return;
+    }
+    const transcriptReady = Boolean(DOM.voiceTranscript.value.trim());
+    if (!failed && !voiceConversationActive) {
+      setVoiceStatus(
+        transcriptReady
+          ? "Transcript ready. Send it or tap the microphone to add more."
+          : "Ready for your voice.",
+        false
+      );
+    }
     announce("Voice input stopped");
+    if (!failed && voiceConversationActive && DOM.voiceDialog.open && transcriptReady) {
+      sendVoiceTranscript();
+    } else if (!failed && voiceConversationActive && DOM.voiceDialog.open) {
+      setVoiceStatus("Listening… speak naturally.");
+      resumeLiveVoiceConversation(500);
+    }
   };
-  recognition.onerror = event => {
-    if (event.error !== "aborted") toast(`Voice input: ${event.error}`, "error");
+  instance.onerror = event => {
+    if (event.error === "network" && canUseRecordedVoiceInput()) {
+      failed = true;
+      fallbackToRecording = true;
+      voiceUseRecordedTranscription = true;
+      setVoiceStatus("The browser voice service disconnected. Switching automatically…");
+      DOM.voiceCaption.textContent = "Keeping Live chat connected with Talkaton transcription.";
+      return;
+    }
+    const quietTimeout = event.error === "no-speech" && voiceConversationActive;
+    failed = event.error !== "aborted" && !quietTimeout;
+    const messages = {
+      "not-allowed": "Microphone access was denied. Allow it in site settings and try again.",
+      "service-not-allowed": "Speech recognition is blocked by this browser.",
+      "audio-capture": "No working microphone was found.",
+      "no-speech": "No speech was heard. Tap the microphone and try again.",
+      network: "Voice recognition lost its connection. Check your internet and try again."
+    };
+    if (failed) {
+      voiceConversationActive = false;
+      updateVoiceControls();
+      setVoiceStatus(messages[event.error] || `Voice recognition stopped: ${event.error}.`, true);
+    }
   };
-  recognition.start();
+  try {
+    instance.start();
+  } catch {
+    recognition = null;
+    setVoiceStatus("The microphone is already busy. Wait a moment and try again.", true);
+  }
+}
+
+async function startRecordedVoiceTurn({ skipPermissionCheck = false } = {}) {
+  if (voiceRecorder || recognition || voiceSending || state.loading) return;
+  if (!skipPermissionCheck && !voiceMicrophonePermissionGranted) {
+    setVoiceStatus("Allow microphone access before starting.", true);
+    updateVoiceControls();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1
+      }
+    });
+    if (!DOM.voiceDialog.open || (!voiceConversationActive && DOM.voiceAutoSend.checked)) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+
+    voiceMicrophonePermissionGranted = true;
+    voiceRecorderStream = stream;
+    voiceRecorderChunks = [];
+    voiceRecorderCancelled = false;
+    voiceSoundDetected = false;
+    voiceRecordingStartedAt = performance.now();
+    voiceLastSoundAt = voiceRecordingStartedAt;
+
+    const mimeType = chooseVoiceRecordingMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
+    voiceRecorder = recorder;
+    recorder.ondataavailable = event => {
+      if (event.data?.size) voiceRecorderChunks.push(event.data);
+    };
+    recorder.onerror = () => {
+      voiceRecorderCancelled = true;
+      setVoiceStatus("The microphone recording stopped unexpectedly. Try again.", true);
+      if (voiceConversationActive) voiceConversationActive = false;
+      stopVoiceRecognition({ cancelled: true });
+    };
+    recorder.onstart = () => {
+      DOM.voiceBtn.classList.add("recording");
+      DOM.voiceBtn.setAttribute("aria-pressed", "true");
+      DOM.voiceOrb.classList.add("listening");
+      DOM.voiceOrb.classList.remove("speaking");
+      DOM.voiceCaption.textContent = "Listening…";
+      setVoiceStatus("Listening… speak naturally.");
+      updateVoiceControls();
+      announce(voiceConversationActive ? "Live chat started" : "Voice input started");
+    };
+    recorder.onstop = async () => {
+      const cancelled = voiceRecorderCancelled;
+      const chunks = voiceRecorderChunks.slice();
+      const detectedSpeech = voiceSoundDetected;
+      const recordedType = recorder.mimeType || mimeType || "audio/webm";
+      voiceRecorder = null;
+      voiceRecorderChunks = [];
+      cleanupRecordedVoiceMedia();
+      DOM.voiceBtn.classList.remove("recording");
+      DOM.voiceBtn.setAttribute("aria-pressed", "false");
+      DOM.voiceOrb.classList.remove("listening");
+      updateVoiceControls();
+      if (cancelled) return;
+
+      const audio = new Blob(chunks, { type: recordedType });
+      if (!detectedSpeech || audio.size < 256) {
+        DOM.voiceCaption.textContent = "No speech heard yet.";
+        setVoiceStatus("Listening for you…");
+        if (voiceConversationActive && DOM.voiceDialog.open) resumeLiveVoiceConversation(350);
+        return;
+      }
+
+      try {
+        setVoiceStatus("Transcribing what you said…");
+        DOM.voiceCaption.textContent = "Turning your voice into text…";
+        const text = await transcribeRecordedVoice(audio);
+        if (!text) throw new Error("No speech was detected.");
+        voiceFinalTranscript = text;
+        DOM.voiceTranscript.value = text;
+        DOM.voiceCaption.textContent = text;
+        updateVoiceControls();
+        if (voiceConversationActive && DOM.voiceDialog.open) {
+          await sendVoiceTranscript();
+        } else {
+          setVoiceStatus("Transcript ready. Send it or start again.");
+        }
+      } catch (error) {
+        voiceConversationActive = false;
+        updateVoiceControls();
+        setVoiceStatus(error.message || "Talkaton could not transcribe that recording. Try again.", true);
+      }
+    };
+
+    recorder.start(250);
+    monitorRecordedVoiceActivity(recorder, stream);
+  } catch (error) {
+    cleanupRecordedVoiceMedia();
+    voiceRecorder = null;
+    voiceMicrophonePermissionGranted = error?.name !== "NotAllowedError" && voiceMicrophonePermissionGranted;
+    updateVoiceControls();
+    setVoiceStatus(
+      error?.name === "NotAllowedError"
+        ? "Microphone access was denied. Allow it in site settings and try again."
+        : "Talkaton could not start the microphone. Check that it is connected and not busy.",
+      true
+    );
+  }
+}
+
+function chooseVoiceRecordingMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/webm"
+  ];
+  return candidates.find(type => MediaRecorder.isTypeSupported?.(type)) || "";
+}
+
+function monitorRecordedVoiceActivity(recorder, stream) {
+  voiceRecorderTimeout = setTimeout(() => {
+    if (voiceRecorder === recorder && recorder.state !== "inactive") recorder.stop();
+  }, VOICE_MAX_TURN_MS);
+
+  try {
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    const context = new AudioContextConstructor();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    const samples = new Uint8Array(analyser.fftSize = 1024);
+    source.connect(analyser);
+    voiceAudioContext = context;
+    context.resume?.();
+
+    const sampleVolume = () => {
+      if (voiceRecorder !== recorder || recorder.state === "inactive") return;
+      analyser.getByteTimeDomainData(samples);
+      let total = 0;
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128;
+        total += normalized * normalized;
+      }
+      const volume = Math.sqrt(total / samples.length);
+      const now = performance.now();
+      if (volume >= VOICE_ACTIVITY_THRESHOLD) {
+        voiceSoundDetected = true;
+        voiceLastSoundAt = now;
+      }
+
+      const silentAfterSpeech = voiceSoundDetected && now - voiceLastSoundAt >= VOICE_SILENCE_MS;
+      const waitedWithoutSpeech = !voiceSoundDetected && now - voiceRecordingStartedAt >= VOICE_WAIT_FOR_SPEECH_MS;
+      if (silentAfterSpeech || waitedWithoutSpeech) {
+        if (recorder.state !== "inactive") recorder.stop();
+        return;
+      }
+      voiceSilenceFrame = requestAnimationFrame(sampleVolume);
+    };
+    voiceSilenceFrame = requestAnimationFrame(sampleVolume);
+  } catch {
+    // The maximum-turn timer still lets recording work if audio metering is unavailable.
+  }
+}
+
+function cleanupRecordedVoiceMedia() {
+  if (voiceSilenceFrame !== null) cancelAnimationFrame(voiceSilenceFrame);
+  voiceSilenceFrame = null;
+  if (voiceRecorderTimeout !== null) clearTimeout(voiceRecorderTimeout);
+  voiceRecorderTimeout = null;
+  if (voiceAudioContext) {
+    try { voiceAudioContext.close(); } catch {}
+  }
+  voiceAudioContext = null;
+  if (voiceRecorderStream) {
+    voiceRecorderStream.getTracks().forEach(track => track.stop());
+  }
+  voiceRecorderStream = null;
+}
+
+async function transcribeRecordedVoice(audio) {
+  const headers = await getChatRequestHeaders();
+  delete headers["Content-Type"];
+  headers["Content-Type"] = String(audio.type || "audio/webm").split(";")[0];
+  headers["X-Audio-Language"] = document.documentElement.lang || navigator.language || "en";
+  const response = await fetch("/api/transcribe", {
+    method: "POST",
+    headers,
+    body: audio
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Voice transcription failed (${response.status}).`);
+  }
+  return String(data.text || "").trim();
+}
+
+function stopVoiceRecognition({ cancelled = false } = {}) {
+  if (voiceRecorder) {
+    voiceRecorderCancelled ||= cancelled;
+    if (voiceRecorder.state !== "inactive") {
+      try { voiceRecorder.stop(); } catch {}
+    }
+    return;
+  }
+  const active = recognition;
+  if (!active) return;
+  try {
+    active.stop();
+  } catch {
+    try { active.abort(); } catch {}
+  }
+}
+
+function updateVoiceControls() {
+  const voiceInputActive = Boolean(recognition || voiceRecorder);
+  DOM.voiceSendBtn.disabled = voiceSending || !DOM.voiceTranscript.value.trim();
+  DOM.voicePermissionBtn.textContent = voiceMicrophonePermissionGranted
+    ? "Microphone allowed ✓"
+    : "Allow microphone";
+  DOM.voicePermissionBtn.disabled = voiceMicrophonePermissionGranted || voiceConversationActive;
+  DOM.voicePermissionBtn.classList.toggle("allowed", voiceMicrophonePermissionGranted);
+  DOM.voiceStartBtn.disabled = !voiceMicrophonePermissionGranted && !voiceConversationActive && !voiceInputActive;
+  DOM.voiceStartBtn.textContent = voiceConversationActive
+    ? "End Live chat"
+    : voiceInputActive
+      ? "Stop microphone"
+      : "Start Live chat";
+  DOM.voiceAutoSend.disabled = voiceConversationActive;
+  DOM.voiceDialog.classList.toggle("liveConversation", voiceConversationActive);
+  DOM.voiceLiveIndicator.classList.toggle("active", voiceConversationActive);
+  DOM.voiceLiveIndicator.querySelector("strong").textContent = voiceConversationActive
+    ? voiceSending
+      ? "Live chat · Talkaton is replying"
+      : "Live chat · Listening"
+    : "Live chat off";
+  DOM.voiceOrb.setAttribute(
+    "aria-label",
+    voiceConversationActive ? "End Live chat" : "Start Live chat"
+  );
+}
+
+function setVoiceStatus(message, error = false) {
+  DOM.voiceStatus.textContent = message;
+  DOM.voiceStatus.classList.toggle("error", error);
+}
+
+async function sendVoiceTranscript() {
+  const text = DOM.voiceTranscript.value.trim();
+  if (!text || voiceSending || state.loading) return;
+  stopVoiceRecognition();
+  voiceSending = true;
+  updateVoiceControls();
+  DOM.voiceCaption.textContent = text;
+  setVoiceStatus(voiceConversationActive ? "Talkaton is thinking…" : "Sending to Talkaton…");
+  const chat = getChat();
+  const beforeIds = new Set(chat?.messages.map(message => message.id) || []);
+  try {
+    await sendMessage({ text });
+    DOM.voiceTranscript.value = "";
+    voiceFinalTranscript = "";
+    const reply = [...(getChat()?.messages || [])].reverse().find(message =>
+      message.role === "assistant"
+      && message.status === "complete"
+      && !beforeIds.has(message.id)
+      && message.content
+    );
+    if (reply && DOM.voiceSpeakReplies.checked && DOM.voiceDialog.open) {
+      DOM.voiceCaption.textContent = stripMarkdown(reply.content).slice(0, 280);
+      setVoiceStatus("Talkaton is speaking…");
+      await speakText(reply.content, { liveConversation: voiceConversationActive });
+    }
+    if (voiceConversationActive && DOM.voiceDialog.open) {
+      DOM.voiceCaption.textContent = "Listening for your next turn…";
+      setVoiceStatus("Listening for your next turn…");
+    } else {
+      setVoiceStatus(reply ? "Reply complete. Start again when you’re ready." : "Ready for your next turn.");
+    }
+  } finally {
+    voiceSending = false;
+    updateVoiceControls();
+    if (voiceConversationActive && DOM.voiceDialog.open) resumeLiveVoiceConversation();
+  }
+}
+
+function speakText(text, { liveConversation = false } = {}) {
+  if (!("speechSynthesis" in window) || !state.settings.voice) return Promise.resolve();
+  if (voiceSpeechResolver) voiceSpeechResolver();
+  speechSynthesis.cancel();
+  return new Promise(resolve => {
+    const utterance = new SpeechSynthesisUtterance(stripMarkdown(text));
+    const finish = () => {
+      if (voiceSpeechResolver === finish) voiceSpeechResolver = null;
+      DOM.voiceOrb.classList.remove("speaking");
+      resolve();
+    };
+    voiceSpeechResolver = finish;
+    applySelectedSpeechVoice(utterance);
+    utterance.rate = Number(state.settings.speechRate) || 1;
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    if (liveConversation) DOM.voiceOrb.classList.add("speaking");
+    speechSynthesis.speak(utterance);
+  });
 }
 
 function openSettings() {
+  if (state.loggedIn && state.user) {
+    openProfile();
+    return;
+  }
+  openPreferenceSettings();
+}
+
+function openPreferenceSettings() {
   byId("themeSelect").value = state.settings.theme;
   byId("timestampsToggle").checked = state.settings.timestamps;
   byId("autoScrollToggle").checked = state.settings.autoScroll;
@@ -2488,7 +3608,7 @@ function saveSettingsFromDialog() {
 }
 
 function applyPreferences() {
-  DOM.modeSelect.value = state.mode;
+  if (!canUseModel(state.model)) state.model = defaultState.model;
   DOM.modelSelect.value = state.model;
   DOM.app.classList.toggle("sidebarCollapsed", Boolean(state.sidebarCollapsed));
   applyTheme();
@@ -2512,11 +3632,17 @@ function cycleTheme() {
 
 function openMemory() {
   DOM.memoryContent.replaceChildren();
+  const header = element("div", "memoryActions");
+  header.innerHTML = `
+    <span class="memoryCount">${state.memory.length} ${state.memory.length === 1 ? "memory" : "memories"}</span>
+    <span>
+      <button type="button" class="textActionBtn" data-memory-action="import">Import from another AI</button>
+      ${state.memory.length ? '<button type="button" class="textActionBtn dangerTextBtn" data-memory-action="clearAll">Clear all</button>' : ""}
+    </span>`;
+  DOM.memoryContent.append(header);
   if (!state.memory.length) {
-    DOM.memoryContent.innerHTML = `<div class="dialogEmpty"><strong>No saved memory yet</strong><span>Useful context from your chats will appear here.</span></div>`;
+    DOM.memoryContent.insertAdjacentHTML("beforeend", `<div class="dialogEmpty"><strong>No saved memory yet</strong><span>Import a ChatGPT, Claude, JSON, or plain-text export—or add context by chatting.</span></div>`);
   } else {
-    const header = element("div", "memoryActions");
-    header.innerHTML = `<span class="memoryCount">${state.memory.length} memories</span><button type="button" class="textActionBtn dangerTextBtn" data-memory-action="clearAll">Clear all</button>`;
     const list = element("div", "memoryList");
     [...state.memory].reverse().slice(0, 40).forEach((item, displayIndex) => {
       const realIndex = state.memory.length - 1 - displayIndex;
@@ -2525,16 +3651,18 @@ function openMemory() {
       card.innerHTML = `<div class="memoryCardBody"><strong>${escapeHtml(item.user || "Conversation")}</strong><p>${escapeHtml(item.ai || "")}</p><time>${formatRelativeTime(item.time)}</time></div><button type="button" class="memoryDeleteBtn" data-memory-action="delete" data-memory-index="${realIndex}" aria-label="Delete this memory" title="Delete">×</button>`;
       list.append(card);
     });
-    DOM.memoryContent.append(header, list);
+    DOM.memoryContent.append(list);
   }
   if (!DOM.memoryDialog.open) DOM.memoryDialog.showModal();
 }
 
-function handleMemoryAction(e) {
+async function handleMemoryAction(e) {
   const btn = e.target.closest("[data-memory-action]");
   if (!btn) return;
   const action = btn.dataset.memoryAction;
-  if (action === "clearAll") {
+  if (action === "import") {
+    DOM.memoryImportInput.click();
+  } else if (action === "clearAll") {
     state.memory = [];
     persist();
     openMemory();
@@ -2548,6 +3676,119 @@ function handleMemoryAction(e) {
     DOM.memoryCount.textContent = state.memory.length;
     toast("Memory deleted");
   }
+}
+
+async function importMemoryFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 20 * 1024 * 1024) {
+    toast("That export is too large. Choose a file under 20 MB.", "error");
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const imported = parseImportedMemory(text, file.name);
+    if (!imported.length) throw new Error("No conversations or memory were found in that file.");
+    const seen = new Set(state.memory.map(item => `${item.user}\n${item.ai}`.toLowerCase()));
+    const unique = imported.filter(item => {
+      const key = `${item.user}\n${item.ai}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    state.memory = [...state.memory, ...unique].slice(-CONFIG.MAX_MEMORY);
+    persistChatChange();
+    updateStats();
+    openMemory();
+    toast(`Imported ${unique.length} ${unique.length === 1 ? "memory" : "memories"}`);
+  } catch (error) {
+    toast(error.message || "That memory export could not be imported.", "error");
+  }
+}
+
+function parseImportedMemory(text, fileName = "") {
+  const fallbackTime = Date.now();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = null;
+  }
+
+  const entries = [];
+  const addPair = (user, ai, time = fallbackTime) => {
+    const safeUser = String(user || "").trim().slice(0, 3000);
+    const safeAi = String(ai || "").trim().slice(0, 6000);
+    if (!safeUser && !safeAi) return;
+    entries.push({
+      user: safeUser || `Imported from ${fileName || "another AI"}`,
+      ai: safeAi,
+      time: Number(time || fallbackTime)
+    });
+  };
+
+  const roots = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.conversations)
+      ? parsed.conversations
+      : parsed
+        ? [parsed]
+        : [];
+
+  for (const conversation of roots) {
+    if (Array.isArray(conversation?.mapping)) {
+      // Some exports represent mapping as an array instead of an object.
+      conversation.mapping = Object.fromEntries(conversation.mapping.map((node, index) => [node.id || index, node]));
+    }
+    if (conversation?.mapping && typeof conversation.mapping === "object") {
+      const ordered = Object.values(conversation.mapping)
+        .map(node => node?.message)
+        .filter(Boolean)
+        .sort((a, b) => Number(a.create_time || 0) - Number(b.create_time || 0));
+      let pendingUser = "";
+      for (const message of ordered) {
+        const role = message.author?.role;
+        const content = Array.isArray(message.content?.parts)
+          ? message.content.parts.filter(part => typeof part === "string").join("\n")
+          : String(message.content?.text || "");
+        if (role === "user") pendingUser = content;
+        if (role === "assistant" && (pendingUser || content)) {
+          addPair(pendingUser, content, Number(message.create_time || 0) * 1000 || fallbackTime);
+          pendingUser = "";
+        }
+      }
+      continue;
+    }
+
+    const messages = conversation?.chat_messages || conversation?.messages || conversation?.content;
+    if (Array.isArray(messages)) {
+      let pendingUser = "";
+      for (const message of messages) {
+        const role = String(message.sender || message.role || message.author?.role || "").toLowerCase();
+        const content = Array.isArray(message.content)
+          ? message.content.map(part => part?.text || part).filter(part => typeof part === "string").join("\n")
+          : String(message.text || message.content || "");
+        if (["human", "user"].includes(role)) pendingUser = content;
+        if (["assistant", "ai", "claude"].includes(role) && (pendingUser || content)) {
+          addPair(pendingUser, content, Date.parse(message.created_at || "") || fallbackTime);
+          pendingUser = "";
+        }
+      }
+      continue;
+    }
+
+    if (conversation?.user || conversation?.ai) {
+      addPair(conversation.user, conversation.ai, conversation.time);
+    }
+  }
+
+  if (!entries.length && text.trim()) {
+    const chunks = text.trim().split(/\n{2,}/).filter(Boolean).slice(0, 25);
+    chunks.forEach(chunk => addPair(`Imported from ${fileName || "another AI"}`, chunk));
+  }
+  return entries.slice(-CONFIG.MAX_MEMORY);
 }
 
 async function restoreSession() {
@@ -2659,8 +3900,7 @@ function waitForAuthSession(supabase, timeoutMs = 8000) {
 function openAuthFailure(message) {
   setAuthMode("signIn", { focus: false });
   setAuthMessage(message);
-  if (!DOM.authDialog.open) DOM.authDialog.showModal();
-  requestAnimationFrame(() => DOM.authEmail.focus());
+  showAuthDialog();
 }
 
 function handleRequestedAuthMode() {
@@ -2676,8 +3916,7 @@ function handleRequestedAuthMode() {
   }
 
   setAuthMode(requestedMode === "signup" ? "signUp" : "signIn", { focus: false });
-  if (!DOM.authDialog.open) DOM.authDialog.showModal();
-  requestAnimationFrame(() => DOM.authEmail.focus());
+  showAuthDialog();
 }
 
 function handleRequestedBetaMode() {
@@ -2695,25 +3934,18 @@ function activateRequestedBetaMode() {
   if (!state.loggedIn) {
     setAuthMode("signIn", { focus: false });
     setAuthMessage("Log in with the confirmed account that was approved for the Beta Lab.");
-    if (!DOM.authDialog.open) DOM.authDialog.showModal();
-    requestAnimationFrame(() => DOM.authEmail.focus());
+    showAuthDialog();
     return;
   }
 
   betaModeRequested = false;
   if (!betaApproved) {
-    state.mode = defaultState.mode;
-    DOM.modeSelect.value = state.mode;
-    persist();
     toast("This account is not approved for Beta Lab yet. Request access at talkaton.org/beta.", "error");
     return;
   }
 
-  state.mode = "Beta Lab";
-  DOM.modeSelect.value = state.mode;
-  persist();
-  toast("Beta Lab enabled: all models, higher limits, model comparison, and deep answers are active.");
-  announce("Beta Lab mode enabled");
+  toast("Trusted Beta access is active: all models, higher limits, and model comparison are ready.");
+  announce("Trusted Beta access is active");
 }
 
 async function refreshBetaAccess() {
@@ -2745,7 +3977,7 @@ async function refreshBetaAccess() {
     }
   }
 
-  syncBetaModeAvailability();
+  syncBetaAccessAvailability();
   syncCompareModelPicker();
   updateMessageCounter();
   updateStats();
@@ -2754,14 +3986,162 @@ async function refreshBetaAccess() {
   return betaApproved;
 }
 
-function syncBetaModeAvailability() {
-  DOM.betaModeOption.hidden = !betaApproved;
-  DOM.betaModeOption.disabled = !betaApproved;
-  if (!betaApproved && state.mode === "Beta Lab") {
-    state.mode = defaultState.mode;
-    DOM.modeSelect.value = state.mode;
+async function refreshBillingAccess({ forceRefresh = false } = {}) {
+  subscriptionPlan = "free";
+  billingStatus = {
+    plan: state.loggedIn ? "free" : "guest",
+    paid: false,
+    billingConfigured: false,
+    testMode: false,
+    subscriptionStatus: null
+  };
+
+  try {
+    const response = await fetch(`/api/billing-status${forceRefresh ? "?refresh=1" : ""}`, {
+      headers: await getChatRequestHeaders(),
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error("Billing status is unavailable.");
+    const result = await response.json();
+    if (["plus", "pro", "max"].includes(result?.plan)) subscriptionPlan = result.plan;
+    billingStatus = {
+      plan: result?.plan || (state.loggedIn ? "free" : "guest"),
+      paid: result?.paid === true,
+      billingConfigured: result?.billingConfigured === true,
+      testMode: result?.testMode === true,
+      subscriptionStatus: result?.subscriptionStatus || null
+    };
+  } catch (error) {
+    console.warn("Billing status check unavailable:", error);
+  }
+
+  if (!canUseModel(state.model)) {
+    state.model = defaultState.model;
+    DOM.modelSelect.value = state.model;
     persist();
   }
+  syncCompareModelPicker();
+  updatePlansDialog();
+  updateMessageCounter();
+  updateStats();
+  updateAccount();
+  return billingStatus;
+}
+
+function hasSuccessfulBillingReturn() {
+  return new URL(window.location.href).searchParams.get("billing") === "success";
+}
+
+function handleBillingReturn() {
+  const url = new URL(window.location.href);
+  const result = url.searchParams.get("billing");
+  if (!result) return;
+
+  url.searchParams.delete("billing");
+  url.searchParams.delete("session_id");
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+
+  if (result === "success") {
+    toast(`Talkaton ${capitalize(subscriptionPlan)} is active. Your new limits are ready.`);
+    openPlans();
+  } else if (result === "cancelled") {
+    toast("Checkout canceled. Your current plan did not change.");
+  } else if (result === "returned") {
+    refreshBillingAccess({ forceRefresh: true });
+  }
+}
+
+function openPlans() {
+  window.location.assign("https://subscriptions.talkaton.org");
+}
+
+function updatePlansDialog() {
+  if (!DOM.plansDialogStatus) return;
+  const tier = getUserTier();
+  const unlimited = isUnlimitedTier(tier) || devAccessApproved;
+  DOM.plansDialogStatus.textContent = unlimited
+    ? `${getTierLabel(tier)} includes unlimited Talkaton access.`
+    : `${getTierLabel(tier)} is active.`;
+  DOM.billingTestMode.hidden = !billingStatus.testMode;
+  DOM.manageBillingBtn.hidden = !billingStatus.paid;
+  DOM.profileBillingBtn.hidden = !billingStatus.paid;
+
+  DOM.plansDialog.querySelectorAll("[data-subscribe-plan]").forEach(button => {
+    const plan = button.dataset.subscribePlan;
+    const isCurrent = tier === plan;
+    const mustManage = billingStatus.paid && !isCurrent;
+    button.disabled = isCurrent || unlimited || mustManage || !billingStatus.billingConfigured;
+    button.textContent = isCurrent
+      ? "Current plan"
+      : unlimited
+        ? "Included"
+        : mustManage
+          ? "Use Manage subscription"
+          : billingStatus.billingConfigured
+            ? `Choose ${capitalize(plan)}`
+            : "Checkout setup pending";
+    button.closest("[data-plan-card]")?.classList.toggle("currentPlan", isCurrent);
+  });
+}
+
+async function startPlanCheckout(plan, button) {
+  DOM.plansError.textContent = "";
+  if (!state.loggedIn) {
+    closeDialog(DOM.plansDialog);
+    setAuthMode("signIn", { focus: false });
+    setAuthMessage("Log in to a confirmed account, then choose your Talkaton plan.", "success");
+    showAuthDialog();
+    return;
+  }
+
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Opening Stripe…";
+  try {
+    const response = await fetch("/api/billing-checkout", {
+      method: "POST",
+      headers: await getChatRequestHeaders(),
+      body: JSON.stringify({ plan })
+    });
+    const result = await response.json();
+    if (!response.ok || !result?.url) throw new Error(result?.error || "Checkout could not start.");
+    window.location.assign(result.url);
+  } catch (error) {
+    DOM.plansError.textContent = error.message || "Checkout could not start.";
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+async function openBillingPortal() {
+  DOM.plansError.textContent = "";
+  try {
+    const response = await fetch("/api/billing-portal", {
+      method: "POST",
+      headers: await getChatRequestHeaders(),
+      body: "{}"
+    });
+    const result = await response.json();
+    if (!response.ok || !result?.url) throw new Error(result?.error || "Billing could not open.");
+    window.location.assign(result.url);
+  } catch (error) {
+    if (DOM.plansDialog.open) DOM.plansError.textContent = error.message || "Billing could not open.";
+    else toast(error.message || "Billing could not open.", "error");
+  }
+}
+
+function capitalize(value) {
+  const text = String(value || "");
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+function syncBetaAccessAvailability() {
+  if (!canUseModel(state.model)) {
+    state.model = defaultState.model;
+    DOM.modelSelect.value = state.model;
+    persist();
+  }
+  syncCompareModelPicker();
 }
 
 async function getChatRequestHeaders() {
@@ -2792,8 +4172,21 @@ async function handleAuth() {
   }
   setAuthMode("signIn", { focus: false });
   setAuthMessage("");
+  showAuthDialog();
+}
+
+function showAuthDialog({ focus = true } = {}) {
   if (!DOM.authDialog.open) DOM.authDialog.showModal();
-  requestAnimationFrame(() => DOM.authEmail.focus());
+  requestAnimationFrame(() => {
+    updateGoogleAuthAvailability();
+    if (focus) DOM.authEmail.focus();
+  });
+}
+
+function resetClosedAuthDialog() {
+  DOM.authGoogleBtn.setAttribute("aria-busy", "false");
+  DOM.authGoogleBtn.disabled = !googleAuthEnabled;
+  setAuthMessage("");
 }
 
 async function submitAuth(event) {
@@ -2821,15 +4214,16 @@ async function submitAuth(event) {
   submit.disabled = true;
   DOM.signInTab.disabled = true;
   DOM.signUpTab.disabled = true;
+  DOM.authGoogleBtn.setAttribute("aria-busy", "true");
   DOM.forgotPasswordBtn.disabled = true;
   DOM.resendConfirmationBtn.disabled = true;
-  submit.textContent = isSignUp ? "Creating account…" : "Logging in…";
+  submit.textContent = isSignUp ? "Creating account…" : "Signing in…";
 
   try {
     const supabase = await getSupabase();
 
     if (isSignUp) {
-      const redirectUrl = new URL("/chat/", window.location.origin);
+      const redirectUrl = createAuthEmailRedirect("signup");
       signupConfirmationPending = true;
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -2865,10 +4259,13 @@ async function submitAuth(event) {
         "Account created. We sent you a confirmation email—click the link to finish signing up.",
         "success"
       );
+      showResendConfirmation = true;
+      updateResendConfirmationButton();
       announce("Account created. Confirmation email sent");
       return;
     }
 
+    loginConfirmationPending = true;
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -2877,31 +4274,70 @@ async function submitAuth(event) {
 
     const user = data?.user || data?.session?.user || null;
     if (!user) throw new Error("Login succeeded without a user session. Please try again.");
-    state.user = user;
-    state.loggedIn = true;
-    await refreshBetaAccess();
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+    if (signOutError) throw signOutError;
+    const redirectUrl = createAuthEmailRedirect("login");
+    const { error: emailError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: redirectUrl.toString()
+      }
+    });
+    if (emailError) throw emailError;
+
+    state.user = null;
+    state.loggedIn = false;
     DOM.authPassword.value = "";
-    closeDialog(DOM.authDialog);
     updateAccount();
-    setAuthMessage("");
-    announce("Logged in successfully");
-    await pullFromCloud();
-    activateRequestedBetaMode();
+    setAuthMessage(
+      "Password accepted. We sent a one-time confirmation link—click it to finish logging in.",
+      "success"
+    );
+    showResendConfirmation = true;
+    updateResendConfirmationButton();
+    announce("Password accepted. Login confirmation email sent.");
   } catch (error) {
     const message = String(error?.message || "");
     if (!isSignUp && isUnconfirmedEmailError(error)) {
+      showResendConfirmation = true;
       await resendConfirmationEmail({ emailOverride: email, automatic: true });
     } else {
       setAuthMessage(message || (isSignUp ? "Sign up failed." : "Log in failed."));
     }
   } finally {
     signupConfirmationPending = false;
+    loginConfirmationPending = false;
     submit.disabled = false;
     DOM.signInTab.disabled = false;
     DOM.signUpTab.disabled = false;
+    DOM.authGoogleBtn.setAttribute("aria-busy", "false");
     DOM.forgotPasswordBtn.disabled = false;
     updateResendConfirmationButton();
-    submit.textContent = authMode === "signUp" ? "Sign up" : "Log in";
+    submit.textContent = authMode === "signUp" ? "Create account" : "Sign in";
+  }
+}
+
+async function startGoogleRedirectSignIn() {
+  setAuthMessage("");
+  DOM.authGoogleBtn.setAttribute("aria-busy", "true");
+  DOM.authGoogleBtn.disabled = true;
+  try {
+    const supabase = await getSupabase();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://talkaton.org/chat/",
+        skipBrowserRedirect: true
+      }
+    });
+    if (error) throw error;
+    if (!data?.url) throw new Error("Google sign-in did not return a secure redirect.");
+    window.location.assign(data.url);
+  } catch (error) {
+    setAuthMessage(error?.message || "Google sign-in is unavailable right now. Use email and password instead.");
+    DOM.authGoogleBtn.setAttribute("aria-busy", "false");
+    DOM.authGoogleBtn.disabled = false;
   }
 }
 
@@ -2923,16 +4359,83 @@ function openProfile() {
   const tierDescription = getTierDescription(tier);
   const betaExpiry = formatAccessExpiry(betaAccessExpiresAt);
   const devExpiry = formatAccessExpiry(devAccessExpiresAt);
+  const imagesLeft = getRemainingImages();
+  const searchesLeft = getRemainingSearches();
   DOM.profileDashboard.innerHTML = `
-    <article><span>Your role</span><strong>${tierLabel}</strong><small>${tierDescription}</small></article>
-    <article><span>Trusted Beta</span><strong>${betaApproved ? "Active" : "Not approved"}</strong><small>${betaApproved ? `All models and Beta Lab${betaExpiry ? ` · ${betaExpiry}` : ""}` : "Trusted members only · request access from the Beta page"}</small></article>
-    <article><span>Dev Access</span><strong>${devAccessApproved || isUnlimitedTier(tier) ? "Unlimited" : "Not approved"}</strong><small>${devAccessApproved ? `Infinite messages, images, and web searches${devExpiry ? ` · ${devExpiry}` : ""}` : isUnlimitedTier(tier) ? "Included with your staff role" : betaApproved ? "Request it from the Beta page" : "Available only to approved Beta members"}</small></article>
+    <article><span>Your plan</span><strong>${tierLabel}</strong><small>${tierDescription}</small></article>
+    <article><span>Trusted Beta</span><strong>${betaApproved ? "Active" : "Not approved"}</strong><small>${betaApproved ? `Higher limits; Free accounts use Ollama${betaExpiry ? ` · ${betaExpiry}` : ""}` : "Trusted members only · request access from the Beta page"}</small></article>
+    <article><span>Dev Access</span><strong>${devAccessApproved || isUnlimitedTier(tier) ? "Unlimited" : "Not approved"}</strong><small>${devAccessApproved ? `Infinite messages, images, and web searches${devExpiry ? ` · ${devExpiry}` : ""}` : isUnlimitedTier(tier) ? "Included with your staff role" : "Request it from the Beta page after logging in"}</small></article>
     <article><span>Messages left today</span><strong>${limitText}</strong><small>${tierLabel}</small></article>
+    <article><span>Images left today</span><strong>${imagesLeft}</strong><small>${getImageDailyLimit() || "Free account required"}</small></article>
+    <article><span>Web searches left</span><strong>${searchesLeft}</strong><small>${getSearchDailyLimit()} per day</small></article>
     <article><span>Conversations</span><strong>${state.chats.length}</strong><small>${messageCount} messages in total</small></article>
-    <article><span>Saved memories</span><strong>${state.memory.length}</strong><small>${state.settings.memory ? "Memory is on" : "Memory is paused"}</small></article>`;
+    <article><span>Saved memories</span><strong>${state.memory.length}</strong><small>${state.settings.memory ? "Memory is on" : "Memory is paused"}</small></article>
+    <article><span>Sign-in method</span><strong>${getAccountProviderLabel(state.user)}</strong><small>${state.user.email_confirmed_at ? "Email verified" : "Verification required"}</small></article>
+    <article><span>Cloud sync</span><strong>${navigator.onLine ? "Connected" : "Offline"}</strong><small>${navigator.onLine ? "Chats, images, memory, and settings" : "Changes sync after reconnecting"}</small></article>`;
+
+  DOM.profileBillingBtn.hidden = !billingStatus.paid;
+  DOM.profileAccountStatus.textContent = "";
 
   if (!DOM.profileDialog.open) DOM.profileDialog.showModal();
   requestAnimationFrame(() => DOM.profileUsername.focus());
+}
+
+function getAccountProviderLabel(user) {
+  const provider = String(user?.app_metadata?.provider || user?.identities?.[0]?.provider || "email");
+  return provider === "google" ? "Google" : "Email and password";
+}
+
+async function sendProfilePasswordReset() {
+  if (!state.user?.email) return;
+  DOM.profileAccountStatus.textContent = "Sending password reset email…";
+  DOM.profilePasswordResetBtn.disabled = true;
+  try {
+    const supabase = await getSupabase();
+    const { error } = await supabase.auth.resetPasswordForEmail(state.user.email, {
+      redirectTo: "https://talkaton.org/chat/?password-reset=1"
+    });
+    if (error) throw error;
+    DOM.profileAccountStatus.textContent = "Password reset email sent. Check your inbox and spam folder.";
+  } catch (error) {
+    DOM.profileAccountStatus.textContent = error.message || "Couldn’t send the password reset email.";
+  } finally {
+    DOM.profilePasswordResetBtn.disabled = false;
+  }
+}
+
+async function syncAccountNow() {
+  DOM.profileAccountStatus.textContent = "Syncing your account…";
+  DOM.profileSyncBtn.disabled = true;
+  try {
+    cloudDirty = true;
+    await syncToCloud();
+    if (cloudDirty) throw new Error("Cloud sync will retry automatically.");
+    DOM.profileAccountStatus.textContent = "Cloud sync is up to date.";
+  } catch (error) {
+    DOM.profileAccountStatus.textContent = error.message || "Cloud sync is temporarily unavailable.";
+  } finally {
+    DOM.profileSyncBtn.disabled = false;
+  }
+}
+
+function downloadAccountData() {
+  const accountData = {
+    exportedAt: new Date().toISOString(),
+    account: {
+      email: state.user?.email || "",
+      username: getProfileName(state.user),
+      provider: getAccountProviderLabel(state.user)
+    },
+    ...serializeForCloud(state)
+  };
+  const blob = new Blob([JSON.stringify(accountData, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `talkaton-account-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  DOM.profileAccountStatus.textContent = "Your Talkaton account data was downloaded.";
 }
 
 function formatAccessExpiry(value) {
@@ -3065,7 +4568,7 @@ function resetLocalDataAfterLogout() {
   renderAttachmentTray();
   updateStats();
   updateComposerState();
-  syncBetaModeAvailability();
+  syncBetaAccessAvailability();
   updateAccount();
 }
 
@@ -3135,6 +4638,12 @@ async function createProfileAvatar(file) {
   }
 }
 
+function createAuthEmailRedirect(kind) {
+  const redirect = new URL("https://talkaton.org/chat/");
+  redirect.searchParams.set(kind === "login" ? "login-confirmed" : "signup-confirmed", "1");
+  return redirect;
+}
+
 function setAuthMode(mode, { focus = true } = {}) {
   authMode = mode === "signUp" ? "signUp" : "signIn";
   const isSignUp = authMode === "signUp";
@@ -3142,23 +4651,51 @@ function setAuthMode(mode, { focus = true } = {}) {
   DOM.signInTab.setAttribute("aria-pressed", String(!isSignUp));
   DOM.signUpTab.setAttribute("aria-pressed", String(isSignUp));
   DOM.authEyebrow.textContent = isSignUp ? "Join Talkaton" : "Welcome back";
-  DOM.authTitle.textContent = isSignUp ? "Create your account" : "Log in to Talkaton";
+  DOM.authTitle.textContent = isSignUp ? "Create your Talkaton account" : "Sign in to continue";
   DOM.authIntro.textContent = isSignUp
-    ? "Enter your email and create a password. We’ll email you a confirmation link."
-    : "Welcome back. Enter your account details to continue.";
+    ? "Create your account. We’ll email you a confirmation link."
+    : "Enter your email and password. We’ll send a secure confirmation link.";
   DOM.authConfirmPasswordField.hidden = !isSignUp;
   DOM.authConfirmPassword.disabled = !isSignUp;
   DOM.authConfirmPassword.required = isSignUp;
   DOM.authPassword.autocomplete = isSignUp ? "new-password" : "current-password";
   DOM.authPassword.minLength = isSignUp ? 8 : 0;
   DOM.forgotPasswordBtn.hidden = isSignUp;
-  DOM.authSubmitBtn.textContent = isSignUp ? "Sign up" : "Log in";
+  DOM.signInTab.hidden = !isSignUp;
+  DOM.signUpTab.hidden = isSignUp;
+  DOM.authSwitchText.textContent = isSignUp ? "Already have an account?" : "Need an account?";
+  showResendConfirmation = false;
+  updateGoogleAuthAvailability();
+  DOM.authSubmitBtn.textContent = isSignUp ? "Create account" : "Sign in";
   setAuthMessage("");
   updateResendConfirmationButton();
 
   if (focus) {
     requestAnimationFrame(() => DOM.authEmail.focus());
   }
+}
+
+async function refreshAuthProviderAvailability() {
+  try {
+    const response = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: CONFIG.SUPABASE_KEY },
+      cache: "no-store",
+      credentials: "omit"
+    });
+    if (!response.ok) throw new Error(`Auth settings failed (${response.status})`);
+    const settings = await response.json();
+    googleAuthEnabled = settings?.external?.google === true;
+  } catch (error) {
+    googleAuthEnabled = false;
+    console.warn("Could not check Google sign-in availability:", error);
+  }
+  updateGoogleAuthAvailability();
+}
+
+function updateGoogleAuthAvailability() {
+  DOM.authProviderSection.hidden = !googleAuthEnabled;
+  DOM.authGoogleBtn.disabled = !googleAuthEnabled;
+  DOM.authGoogleBtn.setAttribute("aria-busy", "false");
 }
 
 async function requestPasswordReset() {
@@ -3178,7 +4715,7 @@ async function requestPasswordReset() {
 
   try {
     const supabase = await getSupabase();
-    const redirectUrl = new URL("/chat/", window.location.origin);
+    const redirectUrl = new URL("https://talkaton.org/chat/");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl.toString()
     });
@@ -3214,12 +4751,14 @@ async function resendConfirmationEmail({ emailOverride = "", automatic = false }
   }
 
   const button = DOM.resendConfirmationBtn;
+  showResendConfirmation = true;
+  updateResendConfirmationButton();
   button.disabled = true;
   button.textContent = "Sending confirmation…";
 
   try {
     const supabase = await getSupabase();
-    const redirectUrl = new URL("/chat/", window.location.origin);
+    const redirectUrl = createAuthEmailRedirect("signup");
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
@@ -3272,6 +4811,7 @@ function startResendConfirmationCooldown() {
 
 function updateResendConfirmationButton() {
   const remaining = Math.max(0, Math.ceil((resendConfirmationAvailableAt - Date.now()) / 1_000));
+  DOM.resendConfirmationBtn.hidden = !showResendConfirmation;
   DOM.resendConfirmationBtn.disabled = remaining > 0;
   DOM.resendConfirmationBtn.textContent = remaining > 0
     ? `Resend in ${remaining}s`
@@ -3375,6 +4915,7 @@ function updateAccount() {
     const name = getProfileName(state.user);
     const avatarUrl = getProfileAvatar(state.user);
     const role = getAccountRole(state.user.email);
+    const tier = getUserTier();
     strong.textContent = name;
     small.textContent = passwordRecoveryPending
       ? "Set a new password"
@@ -3382,6 +4923,8 @@ function updateAccount() {
         ? `${role.label} · Unlimited`
         : devAccessApproved
           ? "Dev access · Unlimited"
+          : ["plus", "pro", "max"].includes(tier)
+            ? `${getTierLabel(tier)} · Manage plan`
           : betaApproved
           ? "Beta approved · View profile"
           : "View profile";
@@ -3405,15 +4948,15 @@ function updateAccount() {
 async function updateVisitorCounter() {
   try {
     const supabase = await getSupabase();
-    const { data, error } = await supabase.rpc("record_unique_visit", { p_visitor_id: getVisitorId() });
+    const { data, error } = await supabase.rpc("get_real_member_count");
     if (error) throw error;
     const count = Number(data);
-    if (!Number.isFinite(count)) throw new Error("Invalid visitor count");
+    if (!Number.isFinite(count)) throw new Error("Invalid member count");
     DOM.visitorCount.textContent = count.toLocaleString();
   } catch (error) {
-    console.warn("Visitor counter unavailable:", error);
+    console.warn("Member counter unavailable:", error);
     DOM.visitorCount.textContent = "—";
-    DOM.visitorCount.closest(".visitorCounter").title = "Visitor counter is temporarily unavailable";
+    DOM.visitorCount.closest(".visitorCounter").title = "Member counter is temporarily unavailable";
   }
 }
 
@@ -3429,6 +4972,10 @@ function updateMessageCounter() {
     DOM.messageCounter.textContent = "∞";
     DOM.messageCounter.title = "Unlimited messages";
     DOM.messageCounter.classList.remove("atLimit", "nearLimit");
+  } else if (PAID_TIERS.has(getUserTier()) && remaining === 0) {
+    DOM.messageCounter.textContent = "Ollama";
+    DOM.messageCounter.title = "Premium-model allowance used; messages continue with the Ollama backup";
+    DOM.messageCounter.classList.remove("atLimit", "nearLimit");
   } else {
     const limit = getDailyLimit();
     DOM.messageCounter.textContent = `${remaining}/${limit}`;
@@ -3439,7 +4986,7 @@ function updateMessageCounter() {
 }
 
 function rememberExchange(user, assistant) {
-  if (!state.settings.memory || !assistant) return;
+  if (!state.settings.memory || !assistant || getChat()?.incognito) return;
   state.memory.push({ user, ai: assistant, time: Date.now() });
   if (state.memory.length > CONFIG.MAX_MEMORY) state.memory.shift();
 }
@@ -3453,7 +5000,6 @@ function updateComposerState() {
   DOM.sendBtn.setAttribute("aria-label", state.loading ? "Stop generation" : "Send message");
   DOM.input.disabled = false;
   DOM.modelSelect.disabled = state.loading;
-  DOM.modeSelect.disabled = state.loading;
   DOM.compareBtn.disabled = state.loading;
   DOM.compareModelSelect.disabled = state.loading;
   DOM.charCount.textContent = DOM.input.value.length > 2000 ? DOM.input.value.length.toLocaleString() : "";
@@ -3934,13 +5480,18 @@ function pollCloudChanges() {
 }
 
 function mergeCloudData(cloudData, { authoritative = false } = {}) {
+  const localIncognitoChats = state.chats.filter(chat => chat.incognito);
+  const activeIncognitoId = getChat()?.incognito ? state.currentChatId : "";
   const cloudChats = Array.isArray(cloudData.chats) ? cloudData.chats : [];
   const cloudMemory = Array.isArray(cloudData.memory) ? cloudData.memory : [];
   const cloudSettings = cloudData.settings || {};
   const cloudTime = new Date(cloudData.updated_at || 0).getTime();
 
-  const localHasRealContent = state.chats.some(c => c.messages.length > 0);
-  const localLatest = state.chats.reduce((max, chat) => Math.max(max, chat.updatedAt || 0), 0);
+  const localHasRealContent = state.chats.some(c => !c.incognito && c.messages.length > 0);
+  const localLatest = state.chats.reduce(
+    (max, chat) => chat.incognito ? max : Math.max(max, chat.updatedAt || 0),
+    0
+  );
 
   if (authoritative || !localHasRealContent || cloudTime >= localLatest) {
     state.chats = cloudChats;
@@ -3970,7 +5521,10 @@ function mergeCloudData(cloudData, { authoritative = false } = {}) {
     }).slice(-CONFIG.MAX_MEMORY);
   }
 
-  state.chats = dedupeChatsById(state.chats);
+  state.chats = dedupeChatsById([...localIncognitoChats, ...state.chats]);
+  if (activeIncognitoId && state.chats.some(chat => chat.id === activeIncognitoId)) {
+    state.currentChatId = activeIncognitoId;
+  }
   if (!state.chats.length) {
     const chat = makeChat();
     state.chats = [chat];
@@ -4134,13 +5688,19 @@ function getClientTimeZone() {
 
 function getSupabase() {
   if (!supabasePromise) {
-    supabasePromise = import("https://esm.sh/@supabase/supabase-js@2")
-      .then(({ createClient }) => {
+    supabasePromise = Promise.resolve()
+      .then(() => {
+        const createClient = globalThis.supabase?.createClient;
+        if (typeof createClient !== "function") {
+          throw new Error("Talkaton account service did not load. Refresh the page and try again.");
+        }
         const client = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
           auth: {
             autoRefreshToken: true,
             persistSession: true,
-            detectSessionInUrl: true
+            detectSessionInUrl: true,
+            flowType: "pkce",
+            storage: createSharedAuthStorage()
           }
         });
         client.auth.onAuthStateChange((event, session) => {
@@ -4148,7 +5708,7 @@ function getSupabase() {
             if (initialSessionResolved) return;
             initialSessionResolved = true;
           }
-          if (signupConfirmationPending && event === "SIGNED_IN") return;
+          if ((signupConfirmationPending || loginConfirmationPending) && event === "SIGNED_IN") return;
           if (!["SIGNED_IN", "SIGNED_OUT", "INITIAL_SESSION", "PASSWORD_RECOVERY", "USER_UPDATED"].includes(event)) return;
           const wasLoggedIn = state.loggedIn;
           state.user = session?.user || null;
@@ -4172,15 +5732,25 @@ function getSupabase() {
             devAccessApproved = false;
             betaAccessExpiresAt = "";
             devAccessExpiresAt = "";
-            syncBetaModeAvailability();
+            subscriptionPlan = "free";
+            billingStatus = {
+              plan: "guest",
+              paid: false,
+              billingConfigured: billingStatus.billingConfigured,
+              testMode: billingStatus.testMode,
+              subscriptionStatus: null
+            };
+            syncBetaAccessAvailability();
             closeDialog(DOM.passwordResetDialog);
             closeDialog(DOM.profileDialog);
           }
           updateAccount();
           if ((event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") && session?.user) {
             refreshBetaAccess().then(() => {
-              updateAccount();
-              activateRequestedBetaMode();
+              refreshBillingAccess().then(() => {
+                updateAccount();
+                activateRequestedBetaMode();
+              });
             });
           }
           if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && !wasLoggedIn && session?.user) {
@@ -4196,6 +5766,30 @@ function getSupabase() {
   }
   return supabasePromise;
 }
+
+globalThis.TalkatonHost = Object.freeze({
+  getState: () => state,
+  getPlan: getUserTier,
+  getCurrentChat: getChat,
+  getUser: () => state.user,
+  isLoggedIn: () => state.loggedIn,
+  getSupabase,
+  getAuthHeaders: getChatRequestHeaders,
+  persistChatChange,
+  renderMessages,
+  renderChats,
+  loadMarkdown,
+  sendMessage,
+  createId,
+  toast,
+  announce,
+  openAuth: handleAuth,
+  openDialog(dialog) {
+    if (dialog && !dialog.open) dialog.showModal();
+  },
+  closeDialog
+});
+document.dispatchEvent(new CustomEvent("talkaton:host-ready"));
 
 window.addEventListener("beforeunload", flushPersist);
 setInterval(() => {

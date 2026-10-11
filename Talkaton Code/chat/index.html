@@ -4,25 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0b0c">
-  <meta name="description" content="Welcome to Talkaton! This is an AI website.">
+  <meta name="description" content="Chat with leading AI models in Talkaton. Switch models, compare answers, search the web, create images, upload files, use voice, and save chats to the cloud.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <link rel="canonical" href="https://talkaton.org/chat">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Talkaton">
-  <meta property="og:description" content="Smart. Funny. Slightly unhinged.">
+  <meta property="og:site_name" content="Talkaton">
+  <meta property="og:url" content="https://talkaton.org/chat">
+  <meta property="og:title" content="Talkaton Chat — Use and Compare AI Models">
+  <meta property="og:description" content="Switch between leading AI models, compare answers, search the web, create images, use voice, and keep chats saved in the cloud.">
   <meta property="og:image" content="https://talkaton.org/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Talkaton">
-  <meta name="twitter:description" content="Smart. Funny. Slightly unhinged.">
+  <meta name="twitter:title" content="Talkaton Chat — Use and Compare AI Models">
+  <meta name="twitter:description" content="Switch between leading AI models, compare answers, search the web, create images, use voice, and keep chats saved in the cloud.">
   <meta name="twitter:image" content="https://talkaton.org/og.png">
-  <title>Talkaton</title>
+  <title>Talkaton Chat — Use and Compare AI Models</title>
   <link rel="icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
   <link rel="shortcut icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://esm.sh" crossorigin>
   <link rel="preconnect" href="https://cxulgeojkjnskdyoktkj.supabase.co" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css">
-  <link rel="stylesheet" href="/style.css?v=20260728-model-compare19">
+  <link rel="stylesheet" href="/style.css?v=20260827-code-agent2">
+  <link rel="stylesheet" href="/chat/productivity.css?v=20260802-enterprise1">
 </head>
 <body class="landingMode">
   <a class="skipLink" href="#messageInput">Skip to message composer</a>
@@ -53,14 +57,28 @@
         <kbd>⌘ /</kbd>
       </label>
 
+      <div class="folderControls" aria-label="Chat folders">
+        <label>
+          <span class="srOnly">Show chat folder</span>
+          <select id="chatFolderFilter" aria-label="Show chat folder">
+            <option value="all">All chats</option>
+            <option value="unfiled">Unfiled</option>
+          </select>
+        </label>
+        <button id="newFolderBtn" type="button" aria-label="Create a chat folder" title="New folder">＋</button>
+        <button id="deleteFolderBtn" type="button" aria-label="Delete selected folder" title="Delete folder" disabled>−</button>
+      </div>
+
       <div class="chatList" id="chatList" role="list"></div>
       <div class="chatListSentinel" id="chatListSentinel" aria-hidden="true"></div>
 
       <nav class="sidebarBottom" aria-label="Talkaton">
+        <button id="studioBtn" type="button"><span>Studio</span><span class="navHint" id="studioNavHint">Ready</span></button>
         <button id="memoryBtn" type="button"><span>Memory</span><span class="navHint" id="memoryCount">0</span></button>
         <a href="/"><span>Home</span><span class="navHint">↗</span></a>
         <a href="/beta"><span>Beta</span><span class="navHint">New</span></a>
         <a href="/about"><span>About</span><span class="navHint">↗</span></a>
+        <button id="plansBtn" type="button"><span>Plans</span><span class="navHint">Upgrade</span></button>
         <button id="supportBtn" type="button"><span>Support</span><span class="navHint">✉</span></button>
         <button id="settingsBtn" type="button"><span>Settings</span><span class="navHint">⌘ ,</span></button>
         <div class="accountRow">
@@ -87,12 +105,13 @@
         </div>
 
         <div class="topBarEnd">
-          <div class="visitorCounter" title="Unique visitors">
+          <button class="featurePill" id="incognitoBtn" type="button" aria-pressed="false" title="Incognito chats are not saved">Incognito</button>
+          <div class="visitorCounter" title="Unique confirmed people who joined">
             <span class="visitorPulse" aria-hidden="true"></span>
             <strong id="visitorCount">—</strong>
-            <span>visitors</span>
+            <span>joined</span>
           </div>
-          <span class="statPill messageCounter" id="messageCounter" title="Messages remaining today">25/25</span>
+          <span class="statPill messageCounter" id="messageCounter" title="Messages remaining today">75/75</span>
           <button class="iconBtn clearBtn" id="clearChatBtn" type="button" aria-label="Clear conversation" title="Clear conversation">⌫</button>
         </div>
       </header>
@@ -136,6 +155,10 @@
                 <option value="openai/gpt-5.4-mini">GPT-5.4 Mini</option>
                 <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
                 <option value="google/gemini-2.5-flash-lite">Gemini</option>
+                <option value="~google/gemini-flash-latest">Gemini Flash (1.5 successor)</option>
+                <option value="microsoft/phi-4">Phi 4 (3.5 Mini successor)</option>
+                <option value="cohere/command-r-08-2024">Command R</option>
+                <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B</option>
                 <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B</option>
                 <option value="mistralai/mistral-small-3.1-24b-instruct">Mistral Small</option>
               </select>
@@ -151,31 +174,25 @@
               <button class="toolBtn ripple imageGenerateBtn" id="imageGenerateBtn" type="button" aria-label="Generate an image" title="Generate an image">✦</button>
               <button class="toolBtn ripple" id="imageUploadBtn" type="button" aria-label="Add images" title="Add images">▧</button>
               <button class="toolBtn ripple" id="attachmentBtn" type="button" aria-label="Attach files" title="Attach files">⌁</button>
-              <button class="toolBtn ripple" id="voiceBtn" type="button" aria-pressed="false" aria-label="Start voice input" title="Voice input">●</button>
+              <button class="toolBtn ripple" id="voiceBtn" type="button" aria-pressed="false" aria-label="Open Live chat with Talkaton" title="Live chat with Talkaton">●</button>
             </div>
 
             <div class="composerActions">
               <span class="charCount" id="charCount" aria-live="polite">0</span>
-              <label class="selectWrap">
-                <span class="srOnly">Mode</span>
-                <select id="modeSelect" aria-label="Response mode">
-                  <option>Normal</option>
-                  <option>Chaos</option>
-                  <option>Safe Mode</option>
-                  <option>Coder Mode</option>
-                  <option>Creative</option>
-                  <option id="betaModeOption" value="Beta Lab" hidden disabled>Beta Lab</option>
-                </select>
-              </label>
               <label class="selectWrap modelSelectWrap">
                 <span class="srOnly">Model</span>
                 <select id="modelSelect" aria-label="AI model">
-                  <option value="openai/gpt-5.4-nano" selected>GPT-5.4 Nano</option>
+                  <option value="ollama/default" selected>Ollama</option>
+                  <option value="openai/gpt-5.4-nano">GPT-5.4 Nano</option>
                   <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
                   <option value="openai/gpt-4.1-mini">GPT-4.1 Mini</option>
                   <option value="openai/gpt-5.4-mini">GPT-5.4 Mini</option>
                   <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
                   <option value="google/gemini-2.5-flash-lite">Gemini</option>
+                  <option value="~google/gemini-flash-latest">Gemini Flash (1.5 successor)</option>
+                  <option value="microsoft/phi-4">Phi 4 (3.5 Mini successor)</option>
+                  <option value="cohere/command-r-08-2024">Command R</option>
+                  <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B</option>
                   <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B</option>
                   <option value="mistralai/mistral-small-3.1-24b-instruct">Mistral Small</option>
                 </select>
@@ -203,11 +220,17 @@
     <button id="popoverFolderUpload" type="button"><span aria-hidden="true">▤</span><span><strong>Attach a folder</strong><small>Analyze a project or document folder</small></span></button>
     <button id="generateImageBtn" type="button"><span aria-hidden="true">✦</span><span><strong>Create an image</strong><small>Generate with Talkaton</small></span></button>
     <button id="popoverWebSearch" type="button"><span aria-hidden="true">⌕</span><span><strong>Search the web</strong><small>Find current information</small></span></button>
+    <button id="popoverIncognito" type="button"><span aria-hidden="true">◉</span><span><strong>Incognito chat</strong><small>Never saves to this device or the cloud</small></span></button>
+    <button id="popoverAgentStudio" type="button"><span aria-hidden="true">◇</span><span><strong>Custom agents</strong><small>Build reusable AI teammates</small></span></button>
+    <button id="popoverCanvas" type="button"><span aria-hidden="true">▣</span><span><strong>Canvas</strong><small>Edit artifacts with version history</small></span></button>
+    <button id="popoverDataAnalysis" type="button"><span aria-hidden="true">⌗</span><span><strong>Data analysis</strong><small>Run Python on CSV or Excel files</small></span></button>
+    <button id="popoverExport" type="button"><span aria-hidden="true">⇩</span><span><strong>Export chat</strong><small>Download Markdown, DOCX, or PDF</small></span></button>
   </div>
 
   <input id="imageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden>
   <input id="fileInput" type="file" accept=".pdf,.doc,.docx,.txt,.md,.markdown,.csv,.xls,.xlsx,.json,.html,.htm,.css,.scss,.sass,.less,.js,.mjs,.cjs,.jsx,.ts,.tsx,.vue,.svelte,.astro,.py,.pyw,.java,.c,.cc,.cpp,.cxx,.h,.hpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.kts,.dart,.lua,.r,.scala,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.graphql,.gql,.xml,.svg,.yaml,.yml,.toml,.ini,.cfg,.conf,.env,.log,.ipynb,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json,text/plain,text/markdown,text/csv,text/html,text/css,text/javascript,application/javascript,application/xml" multiple hidden>
   <input id="folderInput" type="file" webkitdirectory directory multiple hidden>
+  <input id="memoryImportInput" type="file" accept=".json,.txt,.md,.markdown,application/json,text/plain,text/markdown" hidden>
 
   <dialog class="dialog" id="settingsDialog" aria-labelledby="settingsTitle">
     <form method="dialog" class="dialogPanel">
@@ -231,35 +254,119 @@
     </div>
   </dialog>
 
-  <dialog class="dialog" id="authDialog" aria-labelledby="authTitle">
-    <form class="dialogPanel compactDialog" id="authForm">
-      <header><div><p class="eyebrow" id="authEyebrow">Welcome back</p><h2 id="authTitle">Log in to Talkaton</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="authDialog" aria-label="Close account dialog">×</button></header>
-      <div class="dialogContent formStack">
-        <div class="authModeTabs" aria-label="Choose account action">
-          <button id="signInTab" type="button" aria-pressed="true">Log in</button>
-          <button id="signUpTab" type="button" aria-pressed="false">Sign up</button>
+  <dialog class="dialog voiceDialog" id="voiceDialog" aria-labelledby="voiceTitle">
+    <div class="dialogPanel voicePanel">
+      <header class="voiceHeader">
+        <div>
+          <p class="eyebrow">Talkaton Voice</p>
+          <h2 id="voiceTitle">Live chat</h2>
         </div>
-        <p class="formIntro" id="authIntro">Welcome back. Enter your account details to continue.</p>
-        <label>Email<input id="authEmail" type="email" autocomplete="email" required></label>
-        <label>Password<input id="authPassword" type="password" autocomplete="current-password" required></label>
-        <label class="authField" id="authConfirmPasswordField" hidden>Confirm password<input id="authConfirmPassword" type="password" autocomplete="new-password" minlength="8" disabled></label>
-        <div class="authHelpRow">
-          <button class="textActionBtn" id="forgotPasswordBtn" type="button">Forgot password?</button>
-          <button class="textActionBtn" id="resendConfirmationBtn" type="button">Resend confirmation email</button>
+        <div class="voiceHeaderMeta">
+          <span id="voiceModelName">Talkaton</span>
+          <label class="voicePicker">
+            <span class="srOnly">Choose Talkaton voice</span>
+            <select id="voiceSelect" aria-label="Choose Talkaton voice">
+              <option value="">System voice</option>
+            </select>
+          </label>
+          <button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="voiceDialog" aria-label="Close voice chat">×</button>
         </div>
+      </header>
+      <div class="dialogContent voiceContent">
+        <p class="voiceIntro">Speak naturally. Talkaton sends each turn, answers aloud, and listens again.</p>
+        <section class="voiceStage" aria-label="Live chat with Talkaton">
+          <div class="voiceLiveIndicator" id="voiceLiveIndicator" aria-live="polite"><span aria-hidden="true"></span><strong>Live chat off</strong></div>
+          <button class="voiceOrb" id="voiceOrb" type="button" aria-label="Start Live chat">
+            <span class="voiceOrbSurface" aria-hidden="true"></span>
+          </button>
+          <p class="voiceStatus" id="voiceStatus" role="status">Ready when you are.</p>
+          <p class="voiceCaption" id="voiceCaption" aria-live="polite">Tap Start, then just talk.</p>
+        </section>
+
+        <details class="voiceDetails">
+          <summary>Transcript and voice options</summary>
+          <div class="voiceDetailsBody">
+            <label>Your transcript<textarea id="voiceTranscript" rows="4" placeholder="What you say will appear here…"></textarea></label>
+            <div class="voiceOptions">
+              <label><input id="voiceRealtimeToggle" type="checkbox" checked> Low-latency WebRTC voice</label>
+              <label><input id="voiceAutoSend" type="checkbox" checked> Keep listening after every reply</label>
+              <label><input id="voiceSpeakReplies" type="checkbox" checked> Read Talkaton’s reply aloud</label>
+            </div>
+            <label class="realtimeVoicePicker">Realtime voice<select id="realtimeVoiceSelect"><option value="marin">Marin</option><option value="cedar">Cedar</option><option value="coral">Coral</option><option value="sage">Sage</option></select></label>
+            <button class="secondaryBtn" id="voiceSendBtn" type="button" disabled>Send transcript manually</button>
+          </div>
+        </details>
+
+        <div class="voiceDock">
+          <button class="voicePermissionBtn" id="voicePermissionBtn" type="button">Allow microphone</button>
+          <button class="voiceStartBtn" id="voiceStartBtn" type="button" disabled>Start Live chat</button>
+          <span class="voiceDockHint">Hands-free voice with <strong>Talkaton</strong></span>
+          <button class="voiceEndBtn" id="voiceEndBtn" type="button" aria-label="End Live chat">×</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="dialog authDialog" id="authDialog" aria-labelledby="authTitle">
+    <form class="authPanel" id="authForm">
+      <button class="authCloseBtn" type="button" data-close-dialog="authDialog" aria-label="Close account dialog">×</button>
+      <div class="authBrand" aria-label="Talkaton"><span>T</span><strong>Talkaton</strong></div>
+      <header class="authHeader">
+        <p class="eyebrow" id="authEyebrow">Talkaton account</p>
+        <h2 id="authTitle">Sign in to continue</h2>
+        <p class="formIntro" id="authIntro">Enter your email and password. We’ll send a secure confirmation link.</p>
+      </header>
+
+      <div class="authBody formStack">
+        <div class="authProviderSection" id="authProviderSection" hidden>
+          <button class="authGoogleBtn" id="authGoogleBtn" type="button">
+            <svg class="googleMark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.32 2.98-7.41Z"></path>
+              <path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.63-2.36l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"></path>
+              <path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.11-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.55l3.35-2.62Z"></path>
+              <path fill="#EA4335" d="M12 5.94c1.47 0 2.78.5 3.81 1.49l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"></path>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <div class="authDivider" aria-hidden="true"><span>OR</span></div>
+        </div>
+
+        <label class="authLabel">Email
+          <span class="authInputWrap"><span class="authFieldIcon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></svg></span><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required></span>
+        </label>
+        <label class="authLabel">Password
+          <span class="authInputWrap"><span class="authFieldIcon authLockIcon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><input id="authPassword" type="password" autocomplete="current-password" placeholder="Enter your password" required></span>
+        </label>
+        <label class="authLabel authField" id="authConfirmPasswordField" hidden>Confirm password
+          <span class="authInputWrap"><span class="authFieldIcon authLockIcon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><input id="authConfirmPassword" type="password" autocomplete="new-password" placeholder="Enter it again" minlength="8" disabled></span>
+        </label>
+
         <p class="formError" id="authError" role="alert"></p>
-        <button class="primaryBtn ripple" id="authSubmitBtn" type="submit">Log in</button>
+        <button class="authSubmitBtn ripple" id="authSubmitBtn" type="submit">Sign in</button>
+
+        <div class="authAccountActions">
+          <button class="textActionBtn" id="forgotPasswordBtn" type="button">Forgot password?</button>
+          <span id="authSwitchText">Need an account?</span>
+          <button class="textActionBtn authSwitchBtn" id="signUpTab" type="button" aria-pressed="false">Sign up</button>
+          <button class="textActionBtn authSwitchBtn" id="signInTab" type="button" aria-pressed="true" hidden>Sign in</button>
+        </div>
+        <button class="textActionBtn authResendBtn" id="resendConfirmationBtn" type="button" hidden>Resend confirmation email</button>
+        <p class="authFinePrint">Your password is protected by your account provider and never stored in your chats.</p>
       </div>
     </form>
   </dialog>
 
   <dialog class="dialog profileDialog" id="profileDialog" aria-labelledby="profileTitle">
     <form class="dialogPanel compactDialog" id="profileForm">
-      <header><div><p class="eyebrow">Your account</p><h2 id="profileTitle">Profile</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="profileDialog" aria-label="Close profile">×</button></header>
+      <header><div><p class="eyebrow">Your account</p><h2 id="profileTitle">Account settings</h2></div><button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="profileDialog" aria-label="Close account settings">×</button></header>
       <div class="dialogContent formStack">
         <div class="profileSection">
           <p class="eyebrow">Settings</p>
           <div class="dashboardGrid" id="profileDashboard"></div>
+          <div class="profilePlanActions">
+            <button class="secondaryBtn" id="profilePlansBtn" type="button">View plans</button>
+            <button class="secondaryBtn" id="profileBillingBtn" type="button" hidden>Manage subscription</button>
+          </div>
         </div>
         <div class="profileAvatarEditor">
           <span class="profileAvatarPreview" id="profileAvatarPreview" aria-hidden="true">
@@ -278,6 +385,16 @@
         </div>
         <label>Username<input id="profileUsername" type="text" autocomplete="nickname" minlength="2" maxlength="30" required></label>
         <label>Email<input id="profileEmail" type="email" autocomplete="email" readonly></label>
+        <section class="profileAccountTools" aria-labelledby="profileSecurityTitle">
+          <div><p class="eyebrow">Account &amp; data</p><h3 id="profileSecurityTitle">Security, sync, and controls</h3></div>
+          <div class="profileToolGrid">
+            <button class="secondaryBtn" id="profilePreferencesBtn" type="button"><strong>App preferences</strong><small>Theme, memory, markdown, and voice</small></button>
+            <button class="secondaryBtn" id="profilePasswordResetBtn" type="button"><strong>Change password</strong><small>Send a secure reset link to your email</small></button>
+            <button class="secondaryBtn" id="profileSyncBtn" type="button"><strong>Sync now</strong><small>Save chats, images, memory, and settings</small></button>
+            <button class="secondaryBtn" id="profileDownloadBtn" type="button"><strong>Export account data</strong><small>Download a portable JSON copy</small></button>
+          </div>
+          <p class="profileAccountStatus" id="profileAccountStatus" role="status"></p>
+        </section>
         <p class="formError" id="profileError" role="alert"></p>
         <div class="profileActions">
           <button class="secondaryBtn dangerButton" id="profileLogoutBtn" type="button">Log out</button>
@@ -285,6 +402,60 @@
         </div>
       </div>
     </form>
+  </dialog>
+
+  <dialog class="dialog plansDialog" id="plansDialog" aria-labelledby="plansTitle">
+    <div class="dialogPanel plansPanel">
+      <header>
+        <div><p class="eyebrow">Talkaton subscriptions</p><h2 id="plansTitle">Pick the access that fits you.</h2></div>
+        <button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="plansDialog" aria-label="Close plans">×</button>
+      </header>
+      <div class="dialogContent plansContent">
+        <div class="billingStatusRow">
+          <p id="plansDialogStatus">Guest plan active</p>
+          <span class="testModePill" id="billingTestMode" hidden>Stripe test mode</span>
+        </div>
+
+        <div class="starterPlanGrid" aria-label="Guest and Free plans">
+          <article>
+            <div><span>Guest</span><strong>$0</strong></div>
+            <p>75 messages · no image generation · 25 web searches each day</p>
+          </article>
+          <article>
+            <div><span>Free account</span><strong>$0</strong></div>
+            <p>250 messages · 20 images · 75 web searches each day</p>
+          </article>
+        </div>
+
+        <div class="paidPlanGrid">
+          <article class="paidPlanCard" data-plan-card="plus">
+            <p class="eyebrow">Talkaton Plus</p>
+            <h3><span>$10</span><small>/month</small></h3>
+            <ul><li>All 12 AI models</li><li>1,500 messages per day</li><li>75 images per day</li><li>300 web searches per day</li></ul>
+            <button class="primaryBtn ripple" type="button" data-subscribe-plan="plus">Choose Plus</button>
+          </article>
+          <article class="paidPlanCard featuredPlan" data-plan-card="pro">
+            <span class="popularPill">Most popular</span>
+            <p class="eyebrow">Talkaton Pro</p>
+            <h3><span>$30</span><small>/month</small></h3>
+            <ul><li>All 12 AI models</li><li>5,000 messages per day</li><li>250 images per day</li><li>1,000 web searches per day</li></ul>
+            <button class="primaryBtn ripple" type="button" data-subscribe-plan="pro">Choose Pro</button>
+          </article>
+          <article class="paidPlanCard" data-plan-card="max">
+            <p class="eyebrow">Talkaton Max</p>
+            <h3><span>$50</span><small>/month</small></h3>
+            <ul><li>All 12 AI models</li><li>10,000 messages per day</li><li>500 images per day</li><li>2,500 web searches per day</li></ul>
+            <button class="primaryBtn ripple" type="button" data-subscribe-plan="max">Choose Max</button>
+          </article>
+        </div>
+
+        <p class="formError" id="plansError" role="alert"></p>
+        <div class="plansFooterActions">
+          <span>Cancel anytime through Stripe.</span>
+          <button class="secondaryBtn" id="manageBillingBtn" type="button" hidden>Manage subscription</button>
+        </div>
+      </div>
+    </div>
   </dialog>
 
   <dialog class="dialog" id="passwordResetDialog" aria-labelledby="passwordResetTitle">
@@ -338,6 +509,125 @@
     </div>
   </dialog>
 
+  <dialog class="dialog productivityDialog" id="productivityDialog" aria-labelledby="productivityTitle">
+    <div class="dialogPanel productivityPanel">
+      <header>
+        <div><p class="eyebrow">Talkaton productivity system</p><h2 id="productivityTitle">Studio</h2></div>
+        <button class="iconBtn dialogCloseBtn" type="button" data-close-dialog="productivityDialog" aria-label="Close Studio">×</button>
+      </header>
+
+      <nav class="studioTabs" role="tablist" aria-label="Studio tools">
+        <button type="button" role="tab" aria-selected="true" aria-controls="studioAgentsPanel" data-studio-tab="agents">Agents</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="studioCanvasPanel" data-studio-tab="canvas">Canvas</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="studioAnalysisPanel" data-studio-tab="analysis">Analyze</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="studioWorkspacePanel" data-studio-tab="workspace">Workspace</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="studioDeveloperPanel" data-studio-tab="developer">Developer</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="studioExportPanel" data-studio-tab="export">Export</button>
+      </nav>
+
+      <div class="studioBody">
+        <section class="studioPanel" id="studioAgentsPanel" role="tabpanel" data-studio-panel="agents">
+          <div class="agentStudioGrid">
+            <aside class="studioRail">
+              <div class="studioSectionHeading"><div><span>Custom AI agents</span><small>Private reusable personas</small></div><button id="newAgentBtn" type="button">New</button></div>
+              <div class="agentList" id="agentList" role="list"></div>
+            </aside>
+            <form class="studioForm" id="agentForm">
+              <input id="agentId" type="hidden">
+              <div class="studioSectionHeading"><div><span id="agentFormTitle">Create an agent</span><small>Instructions, knowledge, and tools travel together</small></div><span class="studioStatus" id="activeAgentStatus">No active agent</span></div>
+              <div class="formGrid twoColumns">
+                <label>Name<input id="agentName" type="text" maxlength="60" required placeholder="Research partner"></label>
+                <label>Description<input id="agentDescription" type="text" maxlength="180" placeholder="What this agent is best at"></label>
+              </div>
+              <label>System instructions<textarea id="agentInstructions" rows="7" maxlength="12000" required placeholder="Define the agent’s expertise, behavior, limits, and output style."></textarea></label>
+              <fieldset class="toolToggleGrid">
+                <legend>Available tools</legend>
+                <label><input type="checkbox" name="agentTool" value="web" checked> Web search</label>
+                <label><input type="checkbox" name="agentTool" value="images"> Image generation</label>
+                <label><input type="checkbox" name="agentTool" value="files" checked> Files</label>
+                <label><input type="checkbox" name="agentTool" value="python"> Python analysis</label>
+                <label><input type="checkbox" name="agentTool" value="canvas" checked> Canvas</label>
+              </fieldset>
+              <div class="knowledgeDrop">
+                <div><strong>Knowledge files</strong><small>Text, Markdown, CSV, JSON, code, PDF, DOCX, or spreadsheets</small></div>
+                <button id="agentKnowledgeBtn" type="button">Attach files</button>
+                <input id="agentKnowledgeInput" type="file" accept=".txt,.md,.markdown,.csv,.json,.pdf,.doc,.docx,.xls,.xlsx,.js,.ts,.py,.html,.css,text/plain,text/markdown,text/csv,application/json,application/pdf" multiple hidden>
+              </div>
+              <div class="knowledgeList" id="agentKnowledgeList"></div>
+              <p class="formError" id="agentError" role="alert"></p>
+              <div class="studioActions">
+                <button class="secondaryBtn dangerButton" id="deleteAgentBtn" type="button" hidden>Delete</button>
+                <span></span>
+                <button class="secondaryBtn" id="activateAgentBtn" type="button" hidden>Use this agent</button>
+                <button class="primaryBtn" type="submit">Save agent</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="studioPanel canvasPanel" id="studioCanvasPanel" role="tabpanel" data-studio-panel="canvas" hidden>
+          <div class="canvasSplit">
+            <aside class="canvasRail">
+              <div class="studioSectionHeading"><div><span>Conversation</span><small>Current chat context</small></div></div>
+              <div class="canvasChatMirror" id="canvasChatMirror" aria-label="Current chat transcript"></div>
+              <div class="studioSectionHeading"><div><span>Artifacts</span><small>Documents and code from your chats</small></div><button id="newArtifactBtn" type="button">New</button></div>
+              <div class="artifactList" id="artifactList" role="list"></div>
+            </aside>
+            <div class="canvasWorkspace">
+              <div class="canvasToolbar">
+                <input id="artifactTitle" type="text" maxlength="100" aria-label="Artifact title" placeholder="Untitled artifact">
+                <select id="artifactLanguage" aria-label="Artifact format"><option value="markdown">Markdown</option><option value="html">HTML</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="json">JSON</option><option value="text">Plain text</option></select>
+                <select id="artifactVersion" aria-label="Artifact version"></select>
+                <button id="restoreArtifactBtn" type="button">Restore</button>
+              </div>
+              <div class="canvasEditors">
+                <label class="canvasEditor"><span>Edit</span><textarea id="artifactContent" spellcheck="false" aria-label="Artifact source"></textarea></label>
+                <section class="artifactPreview" aria-label="Artifact preview"><header><span>Preview</span><button id="openArtifactWindowBtn" type="button">Open</button></header><div id="artifactPreview"></div></section>
+              </div>
+              <div class="studioActions canvasActions"><button class="secondaryBtn dangerButton" id="deleteArtifactBtn" type="button">Delete</button><span id="artifactSaveStatus" class="studioStatus">Not saved</span><button class="primaryBtn" id="saveArtifactBtn" type="button">Save version</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="studioPanel" id="studioAnalysisPanel" role="tabpanel" data-studio-panel="analysis" hidden>
+          <div class="analysisLayout">
+            <div class="analysisIntro"><span class="eyebrow">Private browser sandbox</span><h3>Python data analysis</h3><p>Analyze CSV or Excel files inside an isolated browser worker. Files remain on your device unless you attach results to a chat.</p></div>
+            <div class="analysisFileRow"><input id="analysisFileInput" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><div><strong id="analysisFileName">No dataset selected</strong><small id="analysisFileMeta">CSV and XLSX supported</small></div></div>
+            <label class="analysisCodeLabel"><span>Python code</span><textarea id="analysisCode" rows="14" spellcheck="false">import pandas as pd
+
+# Your uploaded dataset is available as /data/input
+df = pd.read_csv("/data/input")
+print(df.describe(include="all").to_string())</textarea></label>
+            <div class="studioActions"><button class="secondaryBtn" id="resetAnalysisBtn" type="button">Reset</button><span id="analysisStatus" class="studioStatus">Engine not loaded</span><button class="secondaryBtn" id="stopAnalysisBtn" type="button" disabled>Stop</button><button class="primaryBtn" id="runAnalysisBtn" type="button">Run safely</button></div>
+            <section class="analysisOutput"><header><span>Output</span><button id="artifactFromAnalysisBtn" type="button" disabled>Open as artifact</button></header><pre id="analysisTextOutput">Run code to see results.</pre><div id="analysisVisualOutput"></div></section>
+          </div>
+        </section>
+
+        <section class="studioPanel" id="studioWorkspacePanel" role="tabpanel" data-studio-panel="workspace" hidden>
+          <div class="workspaceGrid">
+            <aside class="studioRail"><div class="studioSectionHeading"><div><span>Workspaces</span><small>Teams, chats, and files</small></div><button id="newWorkspaceBtn" type="button">New</button></div><div id="workspaceList" class="workspaceList"></div></aside>
+            <div class="workspaceContent">
+              <div class="studioSectionHeading"><div><span id="workspaceTitle">Choose a workspace</span><small id="workspaceRole">Sign in to collaborate</small></div><button id="inviteWorkspaceBtn" type="button" disabled>Invite</button></div>
+              <div class="workspaceColumns"><section><header><strong>Shared chats</strong><button id="shareCurrentChatBtn" type="button" disabled>Share current</button></header><div id="workspaceChats" class="workspaceItems"></div></section><section><header><strong>File cabinet</strong><button id="workspaceFileBtn" type="button" disabled>Upload</button></header><input id="workspaceFileInput" type="file" multiple hidden><div id="workspaceFiles" class="workspaceItems"></div></section></div>
+              <p class="formError" id="workspaceError" role="alert"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="studioPanel" id="studioDeveloperPanel" role="tabpanel" data-studio-panel="developer" hidden>
+          <div class="developerGrid">
+            <section class="developerCard"><span class="eyebrow">API access</span><h3>Scoped Talkaton keys</h3><p>Create keys for your own tools. The secret is shown only once and stored as a one-way hash.</p><form id="apiKeyForm" class="formStack"><label>Key name<input id="apiKeyName" type="text" maxlength="80" required placeholder="Production assistant"></label><fieldset class="scopeGrid"><legend>Scopes</legend><label><input type="checkbox" name="apiScope" value="chat:write" checked> Chat</label><label><input type="checkbox" name="apiScope" value="agents:read" checked> Agents</label><label><input type="checkbox" name="apiScope" value="files:read"> Files</label><label><input type="checkbox" name="apiScope" value="workspace:write"> Workspaces</label></fieldset><button class="primaryBtn" type="submit">Create API key</button></form><div id="newApiKeyReveal" class="secretReveal" hidden></div><div id="apiKeyList" class="apiKeyList"></div></section>
+            <section class="developerCard"><span class="eyebrow">Repository sync</span><h3>GitHub</h3><p>Connect GitHub, select a repository, inspect its file tree, and prepare a pull-request proposal without exposing your token to the browser.</p><button class="primaryBtn" id="connectGithubBtn" type="button">Connect GitHub</button><label>Repository<input id="githubRepository" type="text" placeholder="owner/repository"></label><div class="githubActions"><button id="loadRepositoryBtn" type="button">Load files</button><button id="proposePullRequestBtn" type="button">Propose pull request</button></div><div id="githubStatus" class="studioStatus">Not connected</div><div id="repositoryTree" class="repositoryTree"></div></section>
+          </div>
+        </section>
+
+        <section class="studioPanel" id="studioExportPanel" role="tabpanel" data-studio-panel="export" hidden>
+          <div class="exportPanelContent"><span class="eyebrow">Portable conversations</span><h3>Export the current chat</h3><p>Download a clean transcript with model names, timestamps, links, code, and generated-image references.</p><div class="exportCards"><button type="button" data-export-format="md"><strong>Markdown</strong><span>Editable plain text</span></button><button type="button" data-export-format="docx"><strong>Word document</strong><span>Formatted .docx</span></button><button type="button" data-export-format="pdf"><strong>PDF</strong><span>Print-ready document</span></button></div><p id="exportStatus" class="studioStatus">Choose a format.</p></div>
+        </section>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toastRegion" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
   <div class="srOnly" id="announcer" aria-live="polite" aria-atomic="true"></div>
 
@@ -346,6 +636,9 @@
       navigator.serviceWorker.register("/chat/sw.js");
     }
   </script>
-  <script type="module" src="/chat/app.js?v=20260728-model-compare19"></script>
+  <script src="/vendor/supabase-2.57.4.min.js"></script>
+  <script type="module" src="/chat/app.js?v=20260827-code-agent2"></script>
+  <script type="module" src="/chat/productivity.js?v=20260826-studio2"></script>
+  <script type="module" src="/chat/realtime-voice.js?v=20260809-webrtc1"></script>
 </body>
 </html>

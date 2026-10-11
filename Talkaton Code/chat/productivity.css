@@ -1,0 +1,511 @@
+@layer components {
+  .dialog.productivityDialog {
+    width: min(97vw, 1480px);
+    height: min(94dvh, 920px);
+    max-height: 94dvh;
+    border-radius: 22px;
+  }
+
+  .productivityPanel {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .studioTabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 10px var(--space-5);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    scrollbar-width: none;
+  }
+
+  .studioTabs::-webkit-scrollbar { display: none; }
+
+  .studioTabs button {
+    flex: 0 0 auto;
+    padding: 8px 13px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .studioTabs button[aria-selected="true"] {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface-raised));
+    color: var(--text);
+  }
+
+  .studioBody,
+  .studioPanel {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .studioPanel {
+    overflow: auto;
+    background: var(--bg);
+  }
+
+  .agentStudioGrid,
+  .canvasSplit,
+  .workspaceGrid {
+    display: grid;
+    grid-template-columns: minmax(220px, .28fr) minmax(0, 1fr);
+    min-height: 100%;
+  }
+
+  .studioRail,
+  .canvasRail {
+    min-width: 0;
+    padding: var(--space-5);
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .canvasChatMirror {
+    display: grid;
+    gap: 10px;
+    max-height: 42vh;
+    margin: 0 calc(-1 * var(--space-5)) var(--space-5);
+    overflow: auto;
+    padding: 0 var(--space-5) var(--space-5);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .canvasChatMirror article {
+    display: grid;
+    gap: 5px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+  }
+
+  .canvasChatMirror article.canvasChatUser {
+    margin-left: 18px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised));
+  }
+
+  .canvasChatMirror strong { font-size: 10px; }
+  .canvasChatMirror p {
+    max-height: 110px;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 10px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  .studioSectionHeading,
+  .canvasToolbar,
+  .studioActions,
+  .analysisFileRow,
+  .analysisOutput > header,
+  .workspaceColumns section > header,
+  .githubActions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .studioSectionHeading {
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+  }
+
+  .studioSectionHeading > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .studioSectionHeading span,
+  .workspaceColumns strong {
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .studioSectionHeading small,
+  .analysisFileRow small {
+    color: var(--muted);
+    font-size: 9px;
+  }
+
+  .studioSectionHeading button,
+  .canvasToolbar button,
+  .analysisOutput button,
+  .workspaceColumns header button,
+  .githubActions button {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .agentList,
+  .artifactList,
+  .workspaceList,
+  .workspaceItems,
+  .apiKeyList,
+  .repositoryTree {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+
+  .studioListItem {
+    display: grid;
+    width: 100%;
+    gap: 3px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-raised);
+    color: var(--text);
+    text-align: left;
+  }
+
+  .studioListItem.active {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised));
+  }
+
+  .studioListItem strong { font-size: 11px; }
+  .studioListItem small { overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+  .studioForm,
+  .workspaceContent,
+  .analysisLayout,
+  .developerGrid,
+  .exportPanelContent {
+    padding: clamp(18px, 3vw, 34px);
+  }
+
+  .studioForm {
+    display: grid;
+    align-content: start;
+    gap: var(--space-4);
+  }
+
+  .studioForm > label,
+  .analysisCodeLabel,
+  .developerCard > label,
+  .developerCard form > label {
+    display: grid;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .formGrid {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .formGrid.twoColumns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .studioForm input,
+  .studioForm textarea,
+  .canvasToolbar input,
+  .canvasToolbar select,
+  .canvasEditor textarea,
+  .analysisCodeLabel textarea,
+  .developerCard input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    outline: none;
+    background: var(--surface-raised);
+    color: var(--text);
+  }
+
+  .studioForm input,
+  .canvasToolbar input,
+  .canvasToolbar select,
+  .developerCard input { min-height: 40px; padding: 0 12px; }
+
+  .studioForm textarea,
+  .canvasEditor textarea,
+  .analysisCodeLabel textarea {
+    padding: 12px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  .studioForm input:focus,
+  .studioForm textarea:focus,
+  .canvasToolbar input:focus,
+  .canvasEditor textarea:focus,
+  .analysisCodeLabel textarea:focus,
+  .developerCard input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
+  }
+
+  .toolToggleGrid,
+  .scopeGrid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .toolToggleGrid legend,
+  .scopeGrid legend {
+    padding: 0 6px;
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 750;
+  }
+
+  .toolToggleGrid label,
+  .scopeGrid label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 10px;
+  }
+
+  .knowledgeDrop,
+  .analysisFileRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 14px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .knowledgeDrop > div,
+  .analysisFileRow > div { display: grid; gap: 3px; }
+  .knowledgeDrop strong,
+  .analysisFileRow strong { font-size: 10px; }
+  .knowledgeDrop small { color: var(--muted); font-size: 9px; }
+  .knowledgeDrop button { padding: 8px 11px; border-radius: 9px; background: var(--text); color: var(--bg); font-size: 10px; font-weight: 800; }
+
+  .knowledgeList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .knowledgeChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+    font-size: 9px;
+  }
+
+  .knowledgeChip button { background: none; color: var(--muted); }
+
+  .studioActions {
+    justify-content: flex-end;
+    margin-top: auto;
+  }
+
+  .studioActions > span:empty { flex: 1; }
+  .studioStatus { color: var(--muted); font-size: 10px; }
+  .studioStatus.success { color: var(--success); }
+  .studioStatus.error { color: var(--danger); }
+
+  .canvasWorkspace {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-width: 0;
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  .canvasToolbar {
+    padding-bottom: var(--space-3);
+  }
+
+  .canvasToolbar input { flex: 1; min-width: 120px; }
+  .canvasToolbar select { width: auto; max-width: 150px; }
+
+  .canvasEditors {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .canvasEditor {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .canvasEditor > span,
+  .artifactPreview > header,
+  .analysisOutput > header {
+    min-height: 40px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .canvasEditor textarea {
+    min-height: 360px;
+    border: 0;
+    border-radius: 0;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    resize: none;
+  }
+
+  .artifactPreview {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .artifactPreview > header,
+  .analysisOutput > header { display: flex; align-items: center; justify-content: space-between; }
+
+  #artifactPreview {
+    min-height: 360px;
+    overflow: auto;
+    padding: 20px;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  #artifactPreview pre { overflow: auto; padding: 12px; border-radius: 10px; background: var(--bg); }
+  #artifactPreview iframe { width: 100%; height: 100%; min-height: 360px; border: 0; border-radius: 8px; background: white; }
+  .canvasActions { padding-top: var(--space-3); }
+
+  .artifactActionBtn { color: var(--accent) !important; }
+
+  .analysisLayout {
+    display: grid;
+    grid-template-columns: minmax(0, .72fr) minmax(340px, 1.28fr);
+    gap: var(--space-4);
+  }
+
+  .analysisIntro { align-self: center; padding: clamp(8px, 4vw, 42px); }
+  .analysisIntro h3,
+  .developerCard h3,
+  .exportPanelContent h3 { margin: 10px 0; font-size: clamp(28px, 4vw, 52px); letter-spacing: -.045em; }
+  .analysisIntro p,
+  .developerCard > p,
+  .exportPanelContent > p { color: var(--muted); font-size: 12px; line-height: 1.65; }
+  .analysisFileRow,
+  .analysisCodeLabel,
+  .analysisOutput,
+  .analysisLayout > .studioActions { grid-column: 2; }
+  .analysisCodeLabel textarea { min-height: 250px; font-family: var(--font-mono); font-size: 11px; resize: vertical; }
+  .analysisOutput { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  .analysisOutput pre { max-height: 260px; overflow: auto; padding: 16px; color: var(--text-secondary); font: 10px/1.6 var(--font-mono); white-space: pre-wrap; }
+  #analysisVisualOutput { display: grid; place-items: center; padding: 0 16px 16px; }
+  #analysisVisualOutput img { max-height: 460px; border-radius: 10px; }
+
+  .workspaceContent { min-width: 0; }
+  .workspaceColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .workspaceColumns section { min-height: 420px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  .workspaceColumns section > header { justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); }
+  .workspaceItems { padding: 12px; }
+
+  .developerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+  .developerCard { display: grid; align-content: start; gap: var(--space-4); min-width: 0; padding: clamp(20px, 3vw, 34px); border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+  .developerCard h3 { font-size: 32px; }
+  .scopeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .secretReveal { overflow-wrap: anywhere; padding: 14px; border: 1px solid color-mix(in srgb, var(--success) 40%, var(--border)); border-radius: 12px; background: color-mix(in srgb, var(--success) 8%, var(--surface-raised)); font: 10px/1.55 var(--font-mono); }
+  .repositoryTree { max-height: 320px; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); font: 9px/1.6 var(--font-mono); }
+
+  .exportPanelContent { display: grid; min-height: 100%; align-content: center; justify-items: center; text-align: center; }
+  .exportPanelContent > p { max-width: 620px; }
+  .exportCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: min(760px, 100%); margin: 34px 0 18px; }
+  .exportCards button { display: grid; gap: 7px; min-height: 130px; place-content: center; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); color: var(--text); }
+  .exportCards button:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .exportCards strong { font-size: 14px; }
+  .exportCards span { color: var(--muted); font-size: 10px; }
+}
+
+.realtimeVoicePicker {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 220px);
+  align-items: center;
+  justify-content: end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.realtimeVoicePicker select {
+  min-height: 38px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+@layer responsive {
+  @media (max-width: 960px) {
+    .agentStudioGrid,
+    .canvasSplit,
+    .workspaceGrid,
+    .analysisLayout,
+    .developerGrid { grid-template-columns: 1fr; }
+
+    .studioRail,
+    .canvasRail { border-right: 0; border-bottom: 1px solid var(--border); }
+    .agentList,
+    .artifactList,
+    .workspaceList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .analysisFileRow,
+    .analysisCodeLabel,
+    .analysisOutput,
+    .analysisLayout > .studioActions { grid-column: auto; }
+  }
+
+  @media (max-width: 680px) {
+    .dialog.productivityDialog { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+    .productivityPanel > header { padding: 14px; }
+    .studioTabs { padding-inline: 12px; }
+    .formGrid.twoColumns,
+    .canvasEditors,
+    .workspaceColumns,
+    .exportCards { grid-template-columns: 1fr; }
+    .toolToggleGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .canvasEditor { border-right: 0; border-bottom: 1px solid var(--border); }
+    .canvasToolbar { flex-wrap: wrap; }
+    .canvasToolbar input { flex-basis: 100%; }
+    .agentList,
+    .artifactList,
+    .workspaceList { grid-template-columns: 1fr; }
+  }
+}

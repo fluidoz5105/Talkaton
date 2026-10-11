@@ -16,9 +16,15 @@ const accessDetail = document.getElementById("betaAccessDetail");
 const accessStatus = document.getElementById("betaAccessStatus");
 const accessAction = document.getElementById("betaAccessAction");
 const devAccessOption = document.getElementById("devAccessOption");
+const approvalInboxLink = document.getElementById("approvalInboxLink");
 
 const SUPABASE_URL = "https://cxulgeojkjnskdyoktkj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475";
+const REVIEWER_EMAILS = new Set([
+  "kantertal1@gmail.com",
+  "donotuseunlessyouaretalkanter@gmail.com",
+  "supportaton@gmail.com"
+]);
 const FEATURE_LABELS = {
   beta_lab: "Beta Lab access",
   dev_access: "Dev Access",
@@ -40,7 +46,7 @@ const REQUEST_TYPES = {
     titlePrefix: "",
     inputLabel: "Why do you need Dev Access?",
     placeholder: "Example: Dev Access for building and testing",
-    hint: "Only approved Beta members can request Dev Access. If approved, it unlocks unlimited messages, images, and web searches for a time chosen by Talkaton staff.",
+    hint: "Confirmed Talkaton accounts can request Dev Access without first joining Beta. If approved, it unlocks unlimited messages, images, and web searches for a time chosen by Talkaton staff.",
     suggestions: ["Dev Access"]
   },
   existing_model: {
@@ -55,6 +61,10 @@ const REQUEST_TYPES = {
       "GPT-5.4 Mini",
       "Claude 3 Haiku",
       "Gemini 2.5 Flash Lite",
+      "Gemini Flash",
+      "Phi 4",
+      "Command R",
+      "Qwen 2.5 72B",
       "DeepSeek Chat",
       "Llama 3.1 8B",
       "Mistral Small"
@@ -132,12 +142,9 @@ function setRequestMessage(message, type = "") {
 async function submitRequest(event) {
   event.preventDefault();
   if (!form.reportValidity()) return;
+  const isDevAccessRequest = typeInput.value === "dev_access";
   if (!currentSession?.user) {
     setRequestMessage("Log in to your confirmed Talkaton account before submitting.", "error");
-    return;
-  }
-  if (typeInput.value === "dev_access" && !betaAccessApproved) {
-    setRequestMessage("Dev Access can only be requested by an active, trusted Beta member.", "error");
     return;
   }
 
@@ -151,15 +158,26 @@ async function submitRequest(event) {
     const storedTitle = requestType.titlePrefix
       ? `${requestType.titlePrefix}: ${requestedTitle}`
       : requestedTitle;
-    const payload = {
-      user_id: currentSession.user.id,
-      user_email: String(currentSession.user.email || "").toLowerCase(),
-      requester_name: nameInput.value.trim(),
-      feature_key: requestType.featureKey,
-      title: storedTitle,
-      details: reasonInput.value.trim()
-    };
-    const { error } = await supabase.from("beta_requests").insert(payload);
+    const requestEmail = String(currentSession.user.email || "").trim().toLowerCase();
+    let error;
+    if (isDevAccessRequest) {
+      ({ error } = await supabase.rpc("submit_dev_access_request", {
+        p_requester_name: nameInput.value.trim(),
+        p_user_email: requestEmail,
+        p_title: storedTitle,
+        p_details: reasonInput.value.trim()
+      }));
+    } else {
+      const payload = {
+        user_id: currentSession.user.id,
+        user_email: requestEmail,
+        requester_name: nameInput.value.trim(),
+        feature_key: requestType.featureKey,
+        title: storedTitle,
+        details: reasonInput.value.trim()
+      };
+      ({ error } = await supabase.from("beta_requests").insert(payload));
+    }
     if (error) throw error;
 
     titleInput.value = "";
@@ -168,9 +186,9 @@ async function submitRequest(event) {
       "Request submitted. Manual review may take a while. If approved, building or enabling it may take additional time.",
       "success"
     );
-    await loadMyRequests();
+    if (currentSession?.user) await loadMyRequests();
   } catch (error) {
-    const missingTable = /beta_requests|schema cache|relation/i.test(error.message || "");
+    const missingTable = /beta_requests|submit_dev_access_request|schema cache|relation|function/i.test(error.message || "");
     setRequestMessage(
       missingTable
         ? "The request queue is finishing setup. Email supportaton@gmail.com if you need help right now."
@@ -178,7 +196,7 @@ async function submitRequest(event) {
       "error"
     );
   } finally {
-    submitButton.disabled = !currentSession?.user;
+    submitButton.disabled = false;
     submitButton.textContent = "Submit request →";
   }
 }
@@ -200,9 +218,9 @@ function updateRequestTypeFields() {
 
 function updateDevRequestAvailability() {
   if (!devAccessOption) return;
-  devAccessOption.hidden = !betaAccessApproved;
-  devAccessOption.disabled = !betaAccessApproved;
-  if (!betaAccessApproved && typeInput.value === "dev_access") {
+  devAccessOption.hidden = false;
+  devAccessOption.disabled = !currentSession?.user;
+  if (devAccessOption.disabled && typeInput.value === "dev_access") {
     typeInput.value = "beta_lab";
     updateRequestTypeFields();
   }
@@ -252,7 +270,7 @@ async function checkBetaAccess() {
       setAccessState({
         label: "Trusted Beta active",
         title: "Your private Beta access is ready",
-        detail: "All 8 models, higher daily limits, instant model comparison, and power answers are active.",
+        detail: "All 12 models, higher daily limits, instant model comparison, and power answers are active.",
         message: `Approved for ${currentSession.user?.email || "this account"}${formatExpiry(result.betaExpiresAt)}. You can now request Dev Access below.`,
         action: "Launch Beta Lab →",
         href: "/chat?beta=1",
@@ -295,11 +313,13 @@ async function loadMyRequests() {
     let { data, error } = await supabase
       .from("beta_requests")
       .select("id, feature_key, title, details, status, admin_note, reviewed_at, access_expires_at, created_at")
+      .eq("user_id", currentSession.user.id)
       .order("created_at", { ascending: false });
     if (error && /access_expires_at|column/i.test(error.message || "")) {
       ({ data, error } = await supabase
         .from("beta_requests")
         .select("id, feature_key, title, details, status, admin_note, reviewed_at, created_at")
+        .eq("user_id", currentSession.user.id)
         .order("created_at", { ascending: false }));
     }
     if (error) throw error;
@@ -393,11 +413,17 @@ async function applySession(session) {
     updateDevRequestAvailability();
   }
   const user = currentSession?.user;
-  emailInput.value = user?.email || "";
+  const confirmedReviewer = Boolean(
+    user?.email_confirmed_at
+    && REVIEWER_EMAILS.has(String(user.email || "").trim().toLowerCase())
+  );
+  if (approvalInboxLink) approvalInboxLink.hidden = !confirmedReviewer;
+  emailInput.readOnly = Boolean(user);
+  if (user?.email) emailInput.value = user.email;
   submitButton.disabled = !user;
 
   if (!user) {
-    setRequestMessage("Log in to submit a custom request. Your confirmed account email will be attached automatically.");
+    setRequestMessage("Log in to a confirmed Talkaton account before requesting Beta or Dev Access.");
   } else if (!nameInput.value) {
     nameInput.value = user.user_metadata?.display_name || user.user_metadata?.full_name || "";
   }
@@ -407,7 +433,10 @@ async function applySession(session) {
 
 async function initialize() {
   try {
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const createClient = globalThis.supabase?.createClient;
+    if (typeof createClient !== "function") {
+      throw new Error("Talkaton account service did not load. Refresh the page and try again.");
+    }
     supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         autoRefreshToken: true,

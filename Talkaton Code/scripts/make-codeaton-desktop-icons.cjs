@@ -1,0 +1,37 @@
+const { readFileSync, writeFileSync } = require("node:fs");
+const { resolve } = require("node:path");
+
+const icoSource = resolve(__dirname, "../desktop/codeaton-assets/Codeaton-256.png");
+const icoDestination = resolve(__dirname, "../desktop/codeaton-assets/Codeaton.ico");
+const icnsSource = resolve(__dirname, "../codeaton/icon-512.png");
+const icnsDestination = resolve(__dirname, "../desktop/codeaton-assets/Codeaton.icns");
+const png = readFileSync(icoSource);
+const header = Buffer.alloc(6);
+header.writeUInt16LE(0, 0);
+header.writeUInt16LE(1, 2);
+header.writeUInt16LE(1, 4);
+const entry = Buffer.alloc(16);
+entry.writeUInt8(0, 0);
+entry.writeUInt8(0, 1);
+entry.writeUInt8(0, 2);
+entry.writeUInt8(0, 3);
+entry.writeUInt16LE(1, 4);
+entry.writeUInt16LE(32, 6);
+entry.writeUInt32LE(png.length, 8);
+entry.writeUInt32LE(22, 12);
+writeFileSync(icoDestination, Buffer.concat([header, entry, png]));
+
+const icnsPng = readFileSync(icnsSource);
+const icnsEntryLength = icnsPng.length + 8;
+const icnsHeader = Buffer.alloc(8);
+icnsHeader.write("icns", 0, "ascii");
+icnsHeader.writeUInt32BE(32 + icnsPng.length, 4);
+const tableOfContents = Buffer.alloc(16);
+tableOfContents.write("TOC ", 0, "ascii");
+tableOfContents.writeUInt32BE(16, 4);
+tableOfContents.write("ic09", 8, "ascii");
+tableOfContents.writeUInt32BE(icnsEntryLength, 12);
+const iconChunk = Buffer.alloc(8);
+iconChunk.write("ic09", 0, "ascii");
+iconChunk.writeUInt32BE(icnsEntryLength, 4);
+writeFileSync(icnsDestination, Buffer.concat([icnsHeader, tableOfContents, iconChunk, icnsPng]));

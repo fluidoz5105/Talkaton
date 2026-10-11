@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.vercel
+.git
+node_modules
+downloads/installers/win-unpacked
+downloads/installers/*.blockmap
+downloads/installers/builder-debug.yml
+desktop
+scripts/build-mac-installer.sh
+scripts/make-desktop-icons.cjs
+.DS_Store
+
+.publish-checkout

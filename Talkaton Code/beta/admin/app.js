@@ -2,6 +2,7 @@ const SUPABASE_URL = "https://cxulgeojkjnskdyoktkj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475";
 const SUPPORT_EMAIL = "supportaton@gmail.com";
 const OWNER_EMAIL = "kantertal1@gmail.com";
+const OWNER_ALT_EMAIL = "donotuseunlessyouaretalkanter@gmail.com";
 const FEATURE_LABELS = {
   beta_lab: "Beta Lab access",
   dev_access: "Dev Access · unlimited usage",
@@ -17,9 +18,10 @@ const statusMessage = document.getElementById("adminStatus");
 const refreshButton = document.getElementById("adminRefreshBtn");
 const searchInput = document.getElementById("adminSearchInput");
 const pendingCount = document.getElementById("adminPendingCount");
-const reviewedArchive = document.getElementById("adminReviewedArchive");
-const reviewedList = document.getElementById("adminReviewedList");
-const reviewedCount = document.getElementById("adminReviewedCount");
+const approvedList = document.getElementById("adminApprovedList");
+const approvedCount = document.getElementById("adminApprovedCount");
+const declinedList = document.getElementById("adminDeclinedList");
+const declinedCount = document.getElementById("adminDeclinedCount");
 
 let supabase;
 let reviewerSession = null;
@@ -37,7 +39,10 @@ requestList.addEventListener("click", handleRequestAction);
 
 async function initialize() {
   try {
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const createClient = globalThis.supabase?.createClient;
+    if (typeof createClient !== "function") {
+      throw new Error("Talkaton account service did not load. Refresh the page and try again.");
+    }
     supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         autoRefreshToken: true,
@@ -58,21 +63,29 @@ async function initialize() {
 
 async function applySession(session) {
   const email = String(session?.user?.email || "").toLowerCase();
-  reviewerRole = email === OWNER_EMAIL
+  const emailConfirmed = Boolean(session?.user?.email_confirmed_at);
+  reviewerRole = emailConfirmed && email === OWNER_EMAIL
     ? "owner"
-    : email === SUPPORT_EMAIL
+    : emailConfirmed && email === OWNER_ALT_EMAIL
+      ? "owner_alt"
+    : emailConfirmed && email === SUPPORT_EMAIL
       ? "support"
       : "";
   reviewerSession = reviewerRole ? session : null;
   reviewerEmail = reviewerSession ? email : "";
 
   if (!session?.user) {
-    showGate("Log in to an approval account", "Use the confirmed Talkaton Owner or Support account, then return to this page.");
+    showGate("Log in to an approval account", "Use a confirmed Talkaton Owner, Owner Alt Account, or Support account, then return to this page.");
+    return;
+  }
+
+  if (!emailConfirmed) {
+    showGate("Confirm this account first", "The approval inbox is only visible to confirmed Owner, Owner Alt Account, and Support accounts.");
     return;
   }
 
   if (!reviewerSession) {
-    showGate("This account cannot open the inbox", `Signed in as ${email}. Only the Talkaton Owner or Support account can review requests.`);
+    showGate("This account cannot open the inbox", `Signed in as ${email}. Only the Talkaton Owner, Owner Alt Account, or Support account can review requests.`);
     return;
   }
 
@@ -81,7 +94,9 @@ async function applySession(session) {
   refreshButton.disabled = false;
   statusMessage.textContent = reviewerRole === "owner"
     ? `Owner access · signed in as ${OWNER_EMAIL}`
-    : `Support access · signed in as ${SUPPORT_EMAIL}`;
+    : reviewerRole === "owner_alt"
+      ? `Owner Alt Account access · signed in as ${OWNER_ALT_EMAIL}`
+      : `Support access · signed in as ${SUPPORT_EMAIL}`;
   await loadRequests();
 }
 
@@ -135,7 +150,8 @@ async function loadRequests() {
 
 function updateCounts() {
   pendingCount.textContent = requests.filter(request => request.status === "pending").length;
-  reviewedCount.textContent = requests.filter(request => request.status !== "pending").length;
+  approvedCount.textContent = requests.filter(request => request.status === "approved").length;
+  declinedCount.textContent = requests.filter(request => request.status === "declined").length;
 }
 
 function getFilteredRequests() {
@@ -174,24 +190,30 @@ function renderRequests() {
 }
 
 function renderReviewedRequests() {
-  reviewedList.replaceChildren();
+  renderReviewedList("approved", approvedList);
+  renderReviewedList("declined", declinedList);
+}
+
+function renderReviewedList(status, list) {
+  list.replaceChildren();
   const query = searchInput.value.trim().toLowerCase();
   const reviewed = requests
-    .filter(request => request.status === "approved" || request.status === "declined")
+    .filter(request => request.status === status)
     .filter(request => !query || requestMatchesSearch(request, query))
     .sort((a, b) => new Date(b.reviewed_at || b.updated_at).getTime() - new Date(a.reviewed_at || a.updated_at).getTime());
 
   if (!reviewed.length) {
     const empty = document.createElement("p");
     empty.className = "betaRequestEmpty";
+    const label = status === "approved" ? "approved" : "declined";
     empty.textContent = query
-      ? "No approved or declined requests match your search."
-      : "No requests have been approved or declined yet.";
-    reviewedList.append(empty);
+      ? `No ${label} requests match your search.`
+      : `No requests have been ${label} yet.`;
+    list.append(empty);
     return;
   }
 
-  reviewed.forEach(request => reviewedList.append(createReviewedRequestCard(request)));
+  reviewed.forEach(request => list.append(createReviewedRequestCard(request)));
 }
 
 function createReviewedRequestCard(request) {
@@ -345,7 +367,7 @@ function createDurationControl(request) {
 
   const hint = document.createElement("small");
   hint.textContent = request.feature_key === "dev_access"
-    ? "Dev Access works only while this person also has active Beta access."
+    ? "Dev Access is independent from Beta, but the requester must already have a confirmed Talkaton account."
     : "When this time ends, Beta perks turn off automatically.";
 
   controls.append(amount, unit);

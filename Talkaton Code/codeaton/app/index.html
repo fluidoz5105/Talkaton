@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101211">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Codeaton Change Studio</title>
+  <link rel="icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/codeaton/icon-192.png">
+  <link rel="manifest" href="/codeaton/manifest.webmanifest">
+  <link rel="stylesheet" href="/codeaton/app/style.css?v=20260828-chat-history1">
+</head>
+<body>
+  <div class="workspace" id="workspace">
+    <header class="titleBar">
+      <a class="workspaceBrand" href="/codeaton" aria-label="Codeaton home"><span>C<i>_</i></span><strong>Codeaton</strong></a>
+      <div class="workspaceIdentity"><strong id="workspaceName">No folder open</strong><small id="workspaceStatus">Choose a local workspace to begin</small></div>
+      <div class="titleActions">
+        <button id="themeBtn" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
+        <button id="openWorkspaceBtn" type="button">Open folder</button>
+        <a href="/chat" title="Open Talkaton chat">Talkaton ↗</a>
+      </div>
+    </header>
+
+    <main class="workspaceMain">
+      <aside class="fileSidebar" aria-label="Workspace files">
+        <header><strong>Project map</strong><button id="refreshTreeBtn" type="button" title="Refresh file tree" disabled>↻</button></header>
+        <label class="fileSearch"><span aria-hidden="true">⌕</span><input id="fileSearchInput" type="search" placeholder="Filter files" autocomplete="off"></label>
+        <div class="emptyFiles" id="emptyFiles"><span>⌁</span><strong>Open a project folder</strong><p>Codeaton only sees the folder you choose.</p><button id="emptyOpenBtn" type="button">Choose folder</button></div>
+        <div class="fileTree" id="fileTree" role="tree" hidden></div>
+        <section class="chatHistory" aria-label="Previous Codeaton chats">
+          <header><strong>Previous chats</strong><span id="chatHistoryCount">0</span></header>
+          <p id="chatHistoryEmpty">Your conversations will appear here.</p>
+          <div id="chatHistoryList" class="chatHistoryList"></div>
+        </section>
+        <footer><span id="fileCount">0 files</span><span>Local</span></footer>
+      </aside>
+
+      <section class="editorPane" aria-label="Code editor">
+        <header class="editorTabs">
+          <div class="activeTab" id="activeTab"><span id="fileDot">●</span><strong id="activeFileName">Welcome</strong><button id="closeFileBtn" type="button" aria-label="Close file" disabled>×</button></div>
+          <div class="editorActions">
+            <button id="reviewChangeBtn" type="button" disabled>Review AI change</button>
+            <button id="saveFileBtn" type="button" disabled>Save <kbd>⌘S</kbd></button>
+          </div>
+        </header>
+
+        <div class="editorWelcome" id="editorWelcome">
+          <div class="welcomeMark">C<i>_</i></div>
+          <h1>Frame it. Build it.<br>Prove it.</h1>
+          <p>Codeaton is a real conversational AI assistant and multi-model coding studio. Chat naturally, ask a coding question, or open a folder and frame a change for Codeaton to build, challenge, and prove before you save.</p>
+          <div class="welcomeActions"><button id="welcomeOpenBtn" type="button">Open a folder</button><button id="welcomeTaskBtn" type="button">Start an AI task</button></div>
+          <dl><div><dt>⌘ O</dt><dd>Open folder</dd></div><div><dt>⌘ S</dt><dd>Save file</dd></div><div><dt>⌘ ↵</dt><dd>Run task</dd></div></dl>
+        </div>
+
+        <div class="editorSurface" id="editorSurface" hidden>
+          <div class="lineNumbers" id="lineNumbers" aria-hidden="true">1</div>
+          <textarea id="codeEditor" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="File editor"></textarea>
+        </div>
+        <footer class="editorStatus"><span id="languageStatus">Plain Text</span><span id="cursorStatus">Ln 1, Col 1</span><span id="saveStatus">No file open</span></footer>
+      </section>
+
+      <aside class="agentPane" aria-label="Codeaton assistant">
+        <header>
+          <div><strong>Model Relay</strong><small id="accountStatus">Guest studio</small></div>
+          <div class="agentHeaderActions"><button id="clearAgentBtn" type="button" title="Clear conversation">New mission</button></div>
+        </header>
+        <div class="usageStrip" aria-label="Daily Codeaton limits"><span id="usageMessages">Missions 75/day</span><span id="usageSearches">Web 25/day</span><span id="usageImages">Images 0/day</span></div>
+        <div class="agentContext" id="agentContext"><span>Context</span><strong>No active file</strong><small>Choose a file to give Codeaton focused context.</small></div>
+        <div class="missionControls">
+          <label>Mode<select id="missionType"><option value="chat">Chat</option><option value="build">Build</option><option value="debug">Debug</option><option value="explain">Explain</option><option value="audit">Audit</option></select></label>
+          <div class="proofRail" aria-label="Mission progress">
+            <span id="missionScope" data-state="active"><b>1</b>Scope</span>
+            <i></i>
+            <span id="missionDraft" data-state="waiting"><b>2</b>Draft</span>
+            <i></i>
+            <span id="missionProof" data-state="waiting"><b>3</b>Proof</span>
+          </div>
+        </div>
+        <div class="agentMessages" id="agentMessages" role="log" aria-live="polite">
+          <article class="agentMessage assistant"><span>C</span><div><strong>Codeaton</strong><p>Hey—I’m Codeaton. You can just chat with me, ask a coding question, or open a file when you want me to prepare a change. I never write to your project until you approve.</p></div></article>
+        </div>
+        <form class="agentComposer" id="agentForm">
+          <textarea id="agentInput" rows="3" maxlength="8000" placeholder="Message Codeaton or describe a change…" aria-label="Codeaton mission"></textarea>
+          <div class="agentToolRow" aria-label="Codeaton tools">
+            <button id="codeatonWebBtn" type="button" aria-pressed="false" title="Search the web with Tavily for the next mission"><span aria-hidden="true">⌕</span> Web</button>
+            <button id="codeatonImageBtn" type="button" aria-pressed="false" title="Create an image from the next prompt"><span aria-hidden="true">✦</span> Image</button>
+            <small id="codeatonToolStatus">Tools ready</small>
+          </div>
+          <div>
+            <select id="agentModel" aria-label="AI model">
+              <option value="ollama/default">Ollama</option>
+              <option value="openai/gpt-5.4-nano">GPT-5.4 Nano</option>
+              <option value="openai/gpt-5.4">GPT-5.4 · Plus/Beta quality</option>
+              <option value="openai/gpt-5.4-mini">GPT-5.4 Mini</option>
+              <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
+              <option value="google/gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+              <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
+              <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B</option>
+            </select>
+            <button id="stopAgentBtn" type="button" hidden>Stop</button>
+            <button id="runAgentBtn" type="submit" aria-label="Run Codeaton task">↑</button>
+          </div>
+          <small>Enter to send · Shift + Enter for a new line · OpenRouter + Tavily + image generation</small>
+        </form>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="diffDialog" aria-labelledby="diffTitle">
+    <div class="diffPanel">
+      <header><div><p>Proposed change</p><h2 id="diffTitle">Review Codeaton’s edit</h2><small id="diffSummary"></small></div><button id="closeDiffBtn" type="button" aria-label="Close review">×</button></header>
+      <div class="diffLegend"><span><i class="removed"></i>Current</span><span><i class="added"></i>Proposed</span><small>Codeaton never auto-writes. You apply, then save.</small></div>
+      <div class="diffContent" id="diffContent"></div>
+      <footer><button id="discardChangeBtn" type="button">Discard proposal</button><button id="challengeChangeBtn" type="button">Challenge with another model</button><button id="applyChangeBtn" type="button">Apply to editor</button></footer>
+    </div>
+  </dialog>
+
+  <div class="workspaceToast" id="workspaceToast" role="status" aria-live="polite" hidden></div>
+
+  <script src="/vendor/supabase-2.57.4.min.js"></script>
+  <script type="module" src="/codeaton/app/app.js?v=20260828-chat-history1"></script>
+</body>
+</html>

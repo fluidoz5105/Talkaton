@@ -1,0 +1,20 @@
+const { readFileSync, writeFileSync } = require("node:fs");
+const { resolve } = require("node:path");
+
+const source = resolve(__dirname, "../desktop/assets/Talkaton-256.png");
+const destination = resolve(__dirname, "../desktop/assets/Talkaton.ico");
+const png = readFileSync(source);
+const header = Buffer.alloc(6);
+header.writeUInt16LE(0, 0);
+header.writeUInt16LE(1, 2);
+header.writeUInt16LE(1, 4);
+const entry = Buffer.alloc(16);
+entry.writeUInt8(0, 0);
+entry.writeUInt8(0, 1);
+entry.writeUInt8(0, 2);
+entry.writeUInt8(0, 3);
+entry.writeUInt16LE(1, 4);
+entry.writeUInt16LE(32, 6);
+entry.writeUInt32LE(png.length, 8);
+entry.writeUInt32LE(22, 12);
+writeFileSync(destination, Buffer.concat([header, entry, png]));

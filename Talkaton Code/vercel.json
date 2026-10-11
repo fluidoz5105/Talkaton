@@ -1,5 +1,42 @@
 {
   "cleanUrls": true,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "subscriptions.talkaton.org"
+        }
+      ],
+      "destination": "/subscriptions",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/missing-out",
+      "has": [
+        {
+          "type": "host",
+          "value": "subscriptions.talkaton.org"
+        }
+      ],
+      "destination": "/subscriptions/missing-out"
+    },
+    {
+      "source": "/((?!api(?:/|$)|vendor(?:/|$)|subscriptions(?:/|$)|favicon(?:-[^/]+)?\\.svg$|og\\.png$).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "subscriptions.talkaton.org"
+        }
+      ],
+      "destination": "/subscriptions"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -11,6 +48,131 @@
         {
           "key": "X-Frame-Options",
           "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/(.+\\.html?)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/chat/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/talkatondesktop/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/codeaton/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/downloads/codeaton-source.zip",
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"codeaton-source.zip\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/downloads/talkaton-desktop-source.zip",
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"talkaton-desktop-source.zip\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/downloads/installers/Talkaton-1.0.0-mac-universal.dmg",
+      "headers": [
+        { "key": "Content-Disposition", "value": "attachment; filename=\"Talkaton-1.0.0-mac-universal.dmg\"" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/downloads/installers/Talkaton-1.0.0-windows-x64-setup.exe",
+      "headers": [
+        { "key": "Content-Disposition", "value": "attachment; filename=\"Talkaton-1.0.0-windows-x64-setup.exe\"" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/downloads/installers/Codeaton-1.0.0-mac-universal.dmg",
+      "headers": [
+        { "key": "Content-Disposition", "value": "attachment; filename=\"Codeaton-1.0.0-mac-universal.dmg\"" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/downloads/installers/Codeaton-1.0.0-windows-x64-setup.exe",
+      "headers": [
+        { "key": "Content-Disposition", "value": "attachment; filename=\"Codeaton-1.0.0-windows-x64-setup.exe\"" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/downloads/(.*)\\.zip",
+      "headers": [
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.+\\.(?:css|js|mjs|cjs))",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.+\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|eot|otf))",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

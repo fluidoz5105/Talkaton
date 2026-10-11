@@ -1,0 +1,144 @@
+:root {
+  color-scheme: dark;
+  --bg: #080809;
+  --panel: #111113;
+  --panel-2: #17171a;
+  --line: #29292e;
+  --muted: #9a9aa3;
+  --text: #f6f6f7;
+  --red: #f44449;
+  --red-dark: #8d2025;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+a { color: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; }
+
+.desktopPage { min-height: 100dvh; overflow: hidden; }
+.desktopNav, .desktopFooter {
+  width: min(1500px, calc(100% - 48px));
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.desktopNav { min-height: 88px; border-bottom: 1px solid var(--line); }
+.desktopBrand { display: inline-flex; align-items: center; gap: 13px; text-decoration: none; }
+.brandMark {
+  display: grid; place-items: center; width: 43px; height: 43px; border-radius: 13px;
+  background: var(--red); color: #fff; font-weight: 900; box-shadow: 0 12px 32px #f4444933;
+}
+.desktopBrand > span:last-child { display: grid; gap: 1px; }
+.desktopBrand strong { font-size: 17px; }
+.desktopBrand small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .16em; }
+.desktopNav nav, .desktopFooter nav { display: flex; align-items: center; gap: 26px; }
+.desktopNav nav a, .desktopFooter a { color: var(--muted); text-decoration: none; font-size: 14px; }
+.desktopNav nav a:hover, .desktopFooter a:hover { color: var(--text); }
+
+.desktopHero {
+  position: relative; width: min(1500px, calc(100% - 48px)); min-height: 760px; margin: auto;
+  display: grid; grid-template-columns: minmax(420px, .8fr) minmax(600px, 1.2fr); align-items: center; gap: 70px;
+}
+.heroGlow { position: absolute; inset: 6% -25% auto 35%; height: 700px; background: radial-gradient(circle, #f4444926, transparent 67%); pointer-events: none; }
+.heroCopy { position: relative; z-index: 2; }
+.eyebrow { color: #ff6d71; text-transform: uppercase; letter-spacing: .18em; font-size: 12px; font-weight: 800; }
+.eyebrow span { display: inline-block; width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #50d890; box-shadow: 0 0 16px #50d890; }
+h1 { margin: 22px 0; font-size: clamp(58px, 6.7vw, 108px); letter-spacing: -.075em; line-height: .91; }
+.heroLead { max-width: 650px; margin: 0; color: #b4b4bb; font-size: clamp(18px, 1.5vw, 23px); line-height: 1.55; }
+.downloadActions { display: flex; align-items: stretch; gap: 12px; margin-top: 34px; }
+.downloadPrimary, .downloadSecondary, .platformDownload, .desktopCta a {
+  border: 0; border-radius: 15px; cursor: pointer; text-decoration: none; font-weight: 800;
+}
+.downloadPrimary { display: flex; align-items: center; gap: 14px; padding: 13px 22px; color: white; background: var(--red); box-shadow: 0 18px 50px #f4444936; }
+.downloadPrimary:hover, .platformDownload:hover, .desktopCta a:hover { background: #ff555a; transform: translateY(-1px); }
+.platformIcon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: #ffffff1a; font-size: 20px; }
+.downloadPrimary > span:last-child { display: grid; text-align: left; }
+.downloadPrimary small { color: #ffe5e6; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+.downloadPrimary strong { font-size: 16px; }
+.downloadSecondary { display: grid; place-items: center; padding: 0 20px; color: #d7d7db; background: #17171a; border: 1px solid #34343a; }
+.downloadSecondary:hover { border-color: #5b5b63; }
+.installStatus { min-height: 22px; color: #77777f; font-size: 13px; }
+
+.appPreview { position: relative; z-index: 1; border: 1px solid #36363c; border-radius: 22px; overflow: hidden; background: #0d0d0f; box-shadow: 0 60px 140px #000, 0 0 0 10px #ffffff05; transform: perspective(1600px) rotateY(-5deg) rotateX(1deg); }
+.windowBar { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 15px; background: #161619; border-bottom: 1px solid #27272c; }
+.windowBar i { width: 10px; height: 10px; border-radius: 50%; background: #f05b60; }
+.windowBar i:nth-child(2) { background: #eeb84e; }
+.windowBar i:nth-child(3) { background: #43c77b; }
+.windowBar span { margin: auto; padding-right: 54px; color: #77777f; font-size: 12px; }
+.previewBody { min-height: 540px; display: grid; grid-template-columns: 215px 1fr; }
+.previewBody aside { position: relative; padding: 17px; background: #111113; border-right: 1px solid #27272c; color: #8c8c94; font-size: 12px; }
+.miniBrand { display: flex; align-items: center; gap: 9px; margin-bottom: 18px; color: white; font-weight: 700; }
+.miniBrand b { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 8px; background: var(--red); }
+.previewBody aside button { width: 100%; padding: 10px; border: 0; border-radius: 9px; background: #321719; color: #ff9b9e; text-align: left; }
+.miniSearch { margin: 12px 0 22px; padding: 9px; border: 1px solid #2d2d32; border-radius: 8px; }
+.previewBody aside small { text-transform: uppercase; letter-spacing: .12em; font-size: 9px; }
+.previewBody aside p { margin: 6px 0; padding: 8px; }
+.previewBody aside p.selected { color: white; border-radius: 7px; background: #202024; }
+.previewBody aside footer { position: absolute; inset: auto 17px 17px; display: flex; gap: 8px; align-items: center; color: white; }
+.previewBody > section { display: grid; grid-template-rows: 56px 1fr; }
+.previewBody > section > header { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #27272c; }
+.previewBody > section > header span { color: #59d995; font-size: 11px; }
+.previewChat { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
+.previewLogo { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; background: var(--red); font-size: 26px; font-weight: 900; box-shadow: 0 16px 40px #f4444940; }
+.previewChat h2 { margin: 20px 0 7px; font-size: 30px; letter-spacing: -.04em; }
+.previewChat > p { max-width: 390px; color: #888891; }
+.previewComposer { width: min(520px, 100%); margin-top: 50px; padding: 17px 18px; border: 1px solid #34343a; border-radius: 16px; color: #77777f; text-align: left; background: #17171a; }
+.previewComposer span { float: right; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: white; color: black; }
+
+.platformSection, .desktopBenefits, .desktopCta { width: min(1350px, calc(100% - 48px)); margin: auto; }
+.platformSection { padding: 130px 0 70px; border-top: 1px solid var(--line); }
+.platformSection > header { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: end; margin-bottom: 44px; }
+.platformSection h2, .desktopCta h2 { margin: 9px 0 0; font-size: clamp(38px, 5vw, 68px); line-height: .98; letter-spacing: -.06em; }
+.platformSection > header > p { color: var(--muted); line-height: 1.6; }
+.platformGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.platformGrid article { display: grid; grid-template-columns: 68px 1fr auto; align-items: center; gap: 22px; min-height: 190px; padding: 28px; border: 1px solid var(--line); border-radius: 22px; background: linear-gradient(145deg, #151518, #0e0e10); }
+.osMark { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 18px; background: #242429; font-size: 30px; }
+.windowsMark { color: #7cbcff; }
+.platformGrid small { color: #77777f; }
+.platformGrid h3 { margin: 5px 0 7px; font-size: 24px; }
+.platformGrid p { margin: 0; color: var(--muted); line-height: 1.5; }
+.platformDownload { padding: 14px 17px; color: white; background: var(--red); white-space: nowrap; }
+.platformGrid article.recommended { border-color: #f444496e; box-shadow: inset 0 0 50px #f444490d; }
+.installerNote { margin: 22px 2px 0; padding: 14px 16px; border: 1px solid #4c3d26; border-radius: 12px; color: #c9b895; background: #1a160f; font-size: 12px; line-height: 1.55; }
+.sourceDownload { margin: 20px 2px 0; color: var(--muted); font-size: 13px; }
+.sourceDownload a { color: var(--text); }
+
+.desktopBenefits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 90px; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: var(--line); }
+.desktopBenefits article { min-height: 260px; padding: 30px; background: #101012; }
+.desktopBenefits span { color: #ff6d71; font: 700 12px ui-monospace, monospace; }
+.desktopBenefits h3 { margin: 55px 0 12px; font-size: 21px; }
+.desktopBenefits p { color: var(--muted); line-height: 1.55; }
+.desktopCta { margin-top: 110px; margin-bottom: 110px; padding: 52px; display: flex; align-items: end; justify-content: space-between; gap: 30px; border: 1px solid #f4444955; border-radius: 25px; background: radial-gradient(circle at 90% 30%, #f4444928, transparent 44%), #121214; }
+.desktopCta a { padding: 18px 23px; color: white; background: var(--red); white-space: nowrap; }
+.desktopCta a span { margin-left: 35px; }
+.desktopFooter { min-height: 110px; border-top: 1px solid var(--line); color: #6f6f76; font-size: 13px; }
+
+@media (max-width: 1050px) {
+  .desktopHero { grid-template-columns: 1fr; padding: 90px 0; }
+  .heroCopy { max-width: 800px; }
+  .appPreview { transform: none; }
+  .platformGrid, .platformSection > header { grid-template-columns: 1fr; }
+  .desktopBenefits { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 680px) {
+  .desktopNav, .desktopFooter, .desktopHero, .platformSection, .desktopBenefits, .desktopCta { width: min(100% - 28px, 1500px); }
+  .desktopNav nav a:first-child { display: none; }
+  .desktopHero { min-height: auto; padding: 70px 0; }
+  h1 { font-size: clamp(52px, 18vw, 82px); }
+  .downloadActions { flex-direction: column; }
+  .downloadSecondary { min-height: 52px; }
+  .previewBody { grid-template-columns: 1fr; min-height: 430px; }
+  .previewBody aside { display: none; }
+  .platformGrid article { grid-template-columns: 58px 1fr; }
+  .platformGrid article .platformDownload { grid-column: 1 / -1; text-align: center; }
+  .desktopBenefits { grid-template-columns: 1fr; }
+  .desktopCta { padding: 34px 25px; flex-direction: column; align-items: stretch; }
+  .desktopCta a { width: 100%; text-align: center; }
+  .desktopFooter { align-items: flex-start; flex-direction: column; justify-content: center; gap: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }

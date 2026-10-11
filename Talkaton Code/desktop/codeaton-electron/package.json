@@ -1,0 +1,43 @@
+{
+  "name": "codeaton-desktop",
+  "version": "1.0.0",
+  "description": "The official Codeaton AI coding workspace for Windows.",
+  "private": true,
+  "packageManager": "pnpm@10.26.2",
+  "main": "main.cjs",
+  "author": "Talkaton",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build:windows": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.talkaton.codeaton",
+    "productName": "Codeaton",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": ["en-US"],
+    "directories": {
+      "output": "../../downloads/installers",
+      "buildResources": "../codeaton-assets"
+    },
+    "files": ["main.cjs", "offline.html", "package.json"],
+    "artifactName": "Codeaton-1.0.0-windows-x64-setup.${ext}",
+    "win": {
+      "icon": "../codeaton-assets/Codeaton.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Codeaton",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

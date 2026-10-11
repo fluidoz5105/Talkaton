@@ -1,0 +1,75 @@
+.missingOutPage {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.missingOutMain {
+  display: grid;
+  min-height: calc(100dvh - 84px);
+  place-items: center;
+  padding-block: 56px;
+}
+
+.missingOutHero {
+  width: min(920px, 100%);
+  padding: clamp(30px, 6vw, 72px);
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at 80% 10%, rgb(240 68 73 / .2), transparent 26rem),
+    var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.missingOutHero h1 {
+  max-width: 800px;
+  margin: 18px 0 24px;
+  font-size: clamp(58px, 11vw, 118px);
+  line-height: .88;
+  letter-spacing: -.075em;
+}
+
+.missingOutHero > p {
+  max-width: 730px;
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(17px, 2vw, 22px);
+  line-height: 1.65;
+}
+
+.missingOutMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 38px;
+}
+
+.missingOutMetrics div {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgb(255 255 255 / .025);
+}
+
+.missingOutMetrics strong {
+  font-size: 28px;
+  letter-spacing: -.04em;
+}
+
+.missingOutMetrics span,
+.missingOutHero > small {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.missingOutHero > small {
+  display: block;
+  margin-top: 18px;
+}
+
+@media (max-width: 640px) {
+  .missingOutMetrics { grid-template-columns: 1fr; }
+  .missingOutHero { border-radius: 24px; }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09090b">
+  <meta name="description" content="See what Talkaton Plus, Pro, and Max add before continuing with the free plan.">
+  <meta name="robots" content="noindex,follow">
+  <title>You’re missing out — Talkaton Subscriptions</title>
+  <link rel="icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/subscriptions/style.css?v=20260802-generous2">
+  <link rel="stylesheet" href="/subscriptions/missing-out/style.css?v=20260802-generous2">
+</head>
+<body class="missingOutPage">
+  <header class="siteHeader">
+    <div class="brand" aria-label="Talkaton subscriptions">
+      <span class="brandMark" aria-hidden="true">T</span>
+      <span><strong>Talkaton</strong><small>Subscriptions</small></span>
+    </div>
+  </header>
+  <main class="missingOutMain">
+    <section class="missingOutHero" aria-labelledby="missingOutTitle">
+      <span class="eyebrow">Before you go</span>
+      <h1 id="missingOutTitle">You’re missing out.</h1>
+      <p>Free is genuinely useful. Paid plans add all 12 models, far more messages, image generation, live web research, model comparison, voice, files, cloud saving, and the new productivity workspace.</p>
+      <div class="missingOutMetrics" aria-label="Paid plan highlights">
+        <div><strong>12</strong><span>AI models</span></div>
+        <div><strong>10K</strong><span>messages daily on Max</span></div>
+        <div><strong>500</strong><span>images daily on Max</span></div>
+      </div>
+      <div class="heroActions">
+        <a class="primaryAction" href="/">See the plans</a>
+        <a class="secondaryAction" href="https://talkaton.org/chat?plan=free">Continue with Free</a>
+      </div>
+      <small>You can upgrade later. Your existing chats and account stay yours.</small>
+    </section>
+  </main>
+  <script>
+    if (location.hostname === "subscriptions.talkaton.org" && location.pathname.startsWith("/subscriptions/missing-out")) {
+      history.replaceState(history.state, "", `/missing-out${location.search}${location.hash}`);
+    }
+  </script>
+</body>
+</html>

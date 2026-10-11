@@ -1,0 +1,42 @@
+{
+  "name": "talkaton-desktop",
+  "version": "1.0.0",
+  "description": "The official Talkaton desktop application for Windows.",
+  "private": true,
+  "main": "main.cjs",
+  "author": "Talkaton",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build:windows": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.talkaton.desktop",
+    "productName": "Talkaton",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": ["en-US"],
+    "directories": {
+      "output": "../../downloads/installers",
+      "buildResources": "../assets"
+    },
+    "files": ["main.cjs", "offline.html", "package.json"],
+    "artifactName": "Talkaton-1.0.0-windows-x64-setup.${ext}",
+    "win": {
+      "icon": "../assets/Talkaton.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Talkaton",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

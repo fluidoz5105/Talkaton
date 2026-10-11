@@ -2,6 +2,7 @@ const SUPABASE_URL = "https://cxulgeojkjnskdyoktkj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475";
 const ACCOUNT_ROLES = new Map([
   ["kantertal1@gmail.com", "owner"],
+  ["donotuseunlessyouaretalkanter@gmail.com", "owner_alt"],
   ["supportaton@gmail.com", "support"]
 ]);
 
@@ -32,6 +33,9 @@ export default async function handler(req, res) {
     }
 
     const user = await response.json();
+    if (!user?.email_confirmed_at) {
+      return res.status(403).json({ approved: false, role: null, error: "Confirm your email before checking private access." });
+    }
     const email = String(user?.email || "").trim().toLowerCase();
     const approvedByMetadata = user?.app_metadata?.beta === true
       || user?.app_metadata?.beta_approved === true;
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
       || getApprovedBetaEmails().has(email)
       || Boolean(betaGrant);
     const devGrant = activeGrants.find(grant => grant.feature_key === "dev_access");
-    const devApproved = Boolean(role) || (approved && Boolean(devGrant));
+    const devApproved = Boolean(role) || Boolean(devGrant);
 
     return res.status(200).json({
       approved,

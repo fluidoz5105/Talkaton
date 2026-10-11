@@ -1,5 +1,5 @@
-const CACHE_NAME = "talkaton-t1785249083495";
-const ASSET_VERSION = "20260728-model-compare19";
+const CACHE_NAME = "talkaton-t1791677714200";
+const ASSET_VERSION = "20260827-code-agent2";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -9,10 +9,19 @@ const PRECACHE_URLS = [
   "/favicon-t-20260728.svg",
   "/og.png",
   "/about",
+  "/chat/productivity.css?v=20260802-enterprise1",
+  "/chat/productivity.js?v=20260826-studio2",
   versioned("/modules/storage.js"),
+  versioned("/modules/private-browser.js"),
   versioned("/modules/keyboard.js"),
   versioned("/modules/markdown.js"),
-  versioned("/modules/uploads.js")
+  versioned("/modules/uploads.js"),
+  "/modules/agent-store.js",
+  "/modules/agent-schema.js",
+  "/modules/artifacts.js",
+  "/modules/python-sandbox.js",
+  "/modules/record-store.js",
+  "/modules/transcript-export.js"
 ];
 
 self.addEventListener("install", event => {

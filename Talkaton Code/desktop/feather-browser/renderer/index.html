@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+    <title>Feather Browser</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="browser-chrome">
+      <div class="tabs-row" id="tabs-row">
+        <div class="window-drag-space" aria-hidden="true"></div>
+        <div class="tabs" id="tabs" role="tablist" aria-label="Open tabs"></div>
+        <button class="icon-button new-tab" id="new-tab" type="button" title="New tab (⌘T)" aria-label="New tab">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+        </button>
+        <div class="drag-tail" aria-hidden="true"></div>
+      </div>
+      <nav class="toolbar" aria-label="Browser controls">
+        <button class="icon-button" id="back" type="button" aria-label="Back" title="Back">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4.5-5 5.5 5 5.5M8 10h8"/></svg>
+        </button>
+        <button class="icon-button" id="forward" type="button" aria-label="Forward" title="Forward">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4.5 5 5.5-5 5.5M12 10H4"/></svg>
+        </button>
+        <button class="icon-button" id="reload" type="button" aria-label="Reload" title="Reload">
+          <svg class="reload-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7.5A6 6 0 1 0 16 11M15.5 3.5v4h-4"/></svg>
+          <svg class="stop-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 6h8v8H6z"/></svg>
+        </button>
+        <button class="icon-button home" id="home" type="button" aria-label="Home" title="New tab">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.5 9 6.5-5.5L16.5 9v7h-5v-4h-3v4h-5z"/></svg>
+        </button>
+        <form class="omnibox-wrap" id="omnibox-form">
+          <span class="site-mark" id="site-mark" aria-hidden="true"></span>
+          <input id="omnibox" name="address" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Address and search" placeholder="Search or enter address">
+          <span class="shortcut-hint" id="shortcut-hint">⌘ L</span>
+        </form>
+        <button class="icon-button" id="extensions" type="button" aria-label="Extensions" title="Extensions">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5V3.3a2.2 2.2 0 1 1 4.4 0v1.2h3.6v3.6h1.2a2.2 2.2 0 1 1 0 4.4h-1.2v3h-4v1.2a2.2 2.2 0 1 1-4.4 0v-1.2H4.5v-3.6H3.3a2.2 2.2 0 1 1 0-4.4h1.2v-3z"/></svg>
+        </button>
+        <button class="icon-button badge-button" id="downloads" type="button" aria-label="Downloads" title="Downloads">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 15.5h12"/></svg>
+          <span class="activity-badge" id="download-badge" hidden></span>
+        </button>
+        <button class="icon-button menu" id="menu" type="button" aria-label="Feather Browser menu" title="Feather Browser menu">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="15" cy="10" r="1"/></svg>
+        </button>
+      </nav>
+    </header>
+    <section class="browser-panel downloads-panel" id="downloads-panel" aria-label="Downloads" hidden>
+      <div class="panel-header">
+        <div><h2>Downloads</h2><p>Files downloaded in this session</p></div>
+        <button class="text-button" type="button" data-action="open-downloads-folder">Open folder</button>
+      </div>
+      <div class="panel-list" id="download-list"></div>
+      <div class="panel-empty" id="download-empty">Downloads will appear here.</div>
+      <div class="panel-footer"><button class="text-button" id="clear-downloads" type="button">Clear finished</button></div>
+    </section>
+    <section class="browser-panel extensions-panel" id="extensions-panel" aria-label="Extensions" hidden>
+      <div class="panel-header">
+        <div><h2>Extensions</h2><p>Unpacked Chromium extensions</p></div>
+        <button class="primary-small" type="button" data-action="install-extension">Install unpacked</button>
+      </div>
+      <div class="panel-list" id="extension-list"></div>
+      <div class="panel-empty" id="extension-empty">No extensions installed.</div>
+      <div class="panel-note">Feather supports Electron’s compatible subset of Chromium extension APIs. Chrome Web Store packages are not supported.</div>
+    </section>
+    <div class="browser-panel menu-popover" id="menu-popover" hidden>
+      <button type="button" data-action="new-tab">New tab <kbd>⌘T</kbd></button>
+      <button type="button" data-action="reopen-tab">Reopen closed tab <kbd>⇧⌘T</kbd></button>
+      <div class="menu-separator"></div>
+      <button type="button" data-open-panel="downloads">Downloads</button>
+      <button type="button" data-open-panel="extensions">Extensions</button>
+      <div class="menu-separator"></div>
+      <div class="menu-note">Feather Browser limits live tabs and background work to stay responsive.</div>
+    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script src="app.js"></script>
+  </body>
+</html>

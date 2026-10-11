@@ -5,6 +5,9 @@ alter table public.beta_requests
   add column if not exists access_expires_at timestamptz;
 
 alter table public.beta_requests
+  alter column user_id drop not null;
+
+alter table public.beta_requests
   drop constraint if exists beta_requests_feature_key_check;
 
 alter table public.beta_requests
@@ -32,6 +35,7 @@ revoke all on function public.has_active_beta_access(uuid) from public;
 grant execute on function public.has_active_beta_access(uuid) to authenticated;
 
 drop policy if exists "Users can submit their own requests" on public.beta_requests;
+drop policy if exists "Users can view their own requests" on public.beta_requests;
 drop policy if exists "Support can view all requests" on public.beta_requests;
 drop policy if exists "Support can review requests" on public.beta_requests;
 drop policy if exists "Support and owner can view all requests" on public.beta_requests;
@@ -48,13 +52,13 @@ create policy "Users can submit their own requests"
     and reviewed_by is null
     and reviewed_at is null
     and access_expires_at is null
-    and (
-      feature_key <> 'dev_access'
-      or public.has_active_beta_access(auth.uid())
-      or coalesce(auth.jwt() -> 'app_metadata' ->> 'beta', 'false') = 'true'
-      or coalesce(auth.jwt() -> 'app_metadata' ->> 'beta_approved', 'false') = 'true'
-    )
   );
+
+create policy "Users can view their own requests"
+  on public.beta_requests
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
 
 create policy "Support and owner can view all requests"
   on public.beta_requests
@@ -62,7 +66,8 @@ create policy "Support and owner can view all requests"
   using (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'kantertal1@gmail.com',
+      'donotuseunlessyouaretalkanter@gmail.com'
     )
   );
 
@@ -72,12 +77,14 @@ create policy "Support and owner can review requests"
   using (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'kantertal1@gmail.com',
+      'donotuseunlessyouaretalkanter@gmail.com'
     )
   )
   with check (
     lower(coalesce(auth.jwt() ->> 'email', '')) in (
       'supportaton@gmail.com',
-      'kantertal1@gmail.com'
+      'kantertal1@gmail.com',
+      'donotuseunlessyouaretalkanter@gmail.com'
     )
   );

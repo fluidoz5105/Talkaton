@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09090b">
+  <meta name="description" content="Meet Codeaton, Talkaton’s multi-model change studio. Frame a coding mission, let one model build it, another challenge it, and review the proof before you save.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+  <link rel="canonical" href="https://talkaton.org/codeaton">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Codeaton by Talkaton">
+  <meta property="og:url" content="https://talkaton.org/codeaton">
+  <meta property="og:title" content="Codeaton — One change. Multiple minds. Your call.">
+  <meta property="og:description" content="A local-first, multi-model change studio with missions, model relays, proof-driven reviews, and no surprise writes.">
+  <meta property="og:image" content="https://talkaton.org/codeaton/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Codeaton — A multi-model change studio">
+  <meta name="twitter:description" content="Frame it, build it, challenge it, prove it, then decide what gets saved.">
+  <meta name="twitter:image" content="https://talkaton.org/codeaton/og.png">
+  <title>Codeaton — Multi-Model Change Studio by Talkaton</title>
+  <link rel="icon" href="/favicon-t-20260728.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/codeaton/icon-192.png">
+  <link rel="manifest" href="/codeaton/manifest.webmanifest">
+  <link rel="stylesheet" href="/codeaton/style.css?v=20260809-codeaton3">
+</head>
+<body>
+  <div class="codeatonSite">
+    <header class="codeNav">
+      <a class="codeBrand" href="/codeaton" aria-label="Codeaton home">
+        <span class="codeMark" aria-hidden="true"><b>C</b><i>_</i></span>
+        <span><strong>Codeaton</strong><small>by Talkaton</small></span>
+      </a>
+      <nav aria-label="Codeaton navigation">
+        <a href="#features">Features</a>
+        <a href="/talkatondesktop">Talkaton Desktop</a>
+        <a class="navLaunch" href="/codeaton/app">Launch Codeaton</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="codeHero">
+        <div class="codeGrid" aria-hidden="true"></div>
+        <div class="codeHeroCopy">
+          <p class="codeEyebrow"><span>●</span> A multi-model change studio</p>
+          <h1>One change.<br>Multiple minds.<br>Your call.</h1>
+          <p class="codeLead">Codeaton turns a coding request into a mission. Stream real model answers through OpenRouter, research with Tavily, create visual assets, and challenge every proposed change before you save.</p>
+          <div class="codeActions">
+            <a id="installCodeatonBtn" class="codePrimary" href="/downloads/installers/Codeaton-1.0.0-mac-universal.dmg?v=20260813-polished1" download>Download for macOS <span>↓</span></a>
+            <a class="codeSecondary" href="/codeaton/app">Try it in your browser</a>
+          </div>
+          <p id="codeInstallStatus" class="codeInstallStatus" role="status" aria-live="polite">Real native installers for macOS and Windows.</p>
+        </div>
+
+        <div class="codeWindow" aria-label="Codeaton workspace preview">
+          <div class="codeWindowBar"><i></i><i></i><i></i><span>Codeaton · talkaton-web</span><kbd>⌘ ⇧ P</kbd></div>
+          <div class="codeWindowBody">
+            <aside class="previewFiles">
+              <header><strong>PROJECT MAP</strong><span>•••</span></header>
+              <p>⌄ TALKATON-WEB</p>
+              <ul>
+                <li>⌄ api</li><li class="nested">chat.js</li><li>⌄ chat</li><li class="nested active">app.js <em>M</em></li><li class="nested">index.html</li><li>⌄ modules</li><li class="nested">storage.js</li><li>vercel.json</li>
+              </ul>
+            </aside>
+            <section class="previewEditor">
+              <header><span>app.js</span><small>JavaScript · UTF-8</small></header>
+              <pre><code><i>128</i> <b>async function</b> saveConversation(chat) {
+<i>129</i>   <b>const</b> payload = serialize(chat);
+<i>130</i>   <b>await</b> cloud.upsert(payload);
+<i>131</i>   markSynced(chat.id);
+<i>132</i> }
+<i>133</i>
+<i>134</i> <span class="added">+ scheduleLiveSync(chat.id);</span></code></pre>
+            </section>
+            <aside class="previewAgent">
+              <header><strong>MODEL RELAY</strong><span>2 minds</span></header>
+              <div class="agentBubble user">Stop duplicate cloud saves without slowing the chat.</div>
+              <div class="agentBubble assistant"><b>Build passed to Challenge.</b><p>GPT drafted the change. Gemini flagged one race condition. The revised proposal now has a proof checklist and a reviewable diff.</p><button>Open Proofrail</button></div>
+              <div class="agentInput">Frame the next mission <span>↑</span></div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="trustBar" aria-label="Codeaton principles">
+        <span>OpenRouter models</span><i></i><span>Tavily research</span><i></i><span>Image Studio</span><i></i><span>No surprise writes</span>
+      </section>
+
+      <section class="codeFeatures" id="features" aria-labelledby="featuresTitle">
+        <header><p class="codeEyebrow">Not another autocomplete box</p><h2 id="featuresTitle">Frame it. Build it.<br>Challenge it. Prove it.</h2></header>
+        <div class="featureGrid">
+          <article class="featureLarge"><span>01 / Mission Map</span><h3>Turn a vague request into a bounded change.</h3><p>Choose Build, Debug, Explain, or Audit. Codeaton keeps the active file, project map, success condition, and stage together instead of burying them in a chat transcript.</p><div class="treeDemo"><b>MISSION · Stop duplicate saves</b><small>Scope · chat/app.js</small><small>Success · one write per message</small><small>Risk · reconnect race</small></div></article>
+          <article><span>02 / Model Relay</span><h3>Let different minds disagree.</h3><p>Start with one Talkaton model, then hand the proposal to another model to challenge assumptions and revise weak spots.</p><div class="modelDots"><i>G</i><i>C</i><i>✦</i><i>Q</i></div></article>
+          <article><span>03 / Proofrail</span><h3>Review the case, not just the code.</h3><p>Scope, draft, challenge, and the final diff stay visible. Codeaton applies a proposal to the editor only after you approve it.</p><div class="diffDemo"><del>single-model guess</del><ins>challenged proposal + proof</ins></div></article>
+          <article><span>04 / Context Lens</span><h3>Focused by design.</h3><p>Codeaton sends the active file, mission, and project names—not unrelated private files or a silent copy of your whole repository.</p></article>
+          <article><span>05 / Local Studio</span><h3>Your files stay yours.</h3><p>Install on macOS or Windows, open a local folder, and decide what reaches disk. The AI never saves behind your back.</p></article>
+          <article><span>06 / Live tools</span><h3>Research and create without leaving the mission.</h3><p>Use Tavily to add current web sources to a coding task, or switch to Image Studio to generate downloadable UI assets and concepts.</p></article>
+        </div>
+      </section>
+
+      <section class="codeDownload" aria-labelledby="downloadTitle">
+        <div>
+          <p class="codeEyebrow">Start building</p>
+          <h2 id="downloadTitle">Start your first Codeaton mission.</h2>
+          <p>Install the change studio, launch it in your browser, or download the complete source and make it your own.</p>
+        </div>
+        <div class="downloadStack">
+          <a id="downloadCodeatonMac" class="downloadPrimary" href="/downloads/installers/Codeaton-1.0.0-mac-universal.dmg?v=20260813-polished1" download="Codeaton-1.0.0-mac-universal.dmg">macOS Universal <span>.dmg</span></a>
+          <a id="downloadCodeatonWindows" href="/downloads/installers/Codeaton-1.0.0-windows-x64-setup.exe" download="Codeaton-1.0.0-windows-x64-setup.exe">Windows 10+ <span>.exe</span></a>
+          <a href="/codeaton/app">Launch browser edition</a>
+          <a href="/downloads/codeaton-source.zip?v=20260809-download2" download="codeaton-source.zip">Download source code</a>
+        </div>
+        <p class="codeInstallerNote">First launch on Mac: Control-click Codeaton in Applications, choose <strong>Open</strong>, then choose <strong>Open</strong> again. Removing this Apple warning for every user requires Developer ID notarization.</p>
+      </section>
+    </main>
+
+    <footer class="codeFooter">
+      <span>Codeaton by Talkaton · © <span data-current-year>2026 - 2026</span></span>
+      <nav><a href="/">Talkaton</a><a href="/talkatondesktop">Desktop</a><a href="mailto:supportaton@gmail.com">Support</a></nav>
+    </footer>
+  </div>
+
+  <script type="module" src="/codeaton/install.js?v=20260809-codeaton3"></script>
+  <script src="/current-year.js?v=20260826" defer></script>
+</body>
+</html>

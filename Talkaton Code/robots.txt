@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /beta/admin
+
+Sitemap: https://talkaton.org/sitemap.xml

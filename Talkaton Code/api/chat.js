@@ -1,4 +1,6 @@
+import { usesOllama, getOllamaFallbackConfig, isOllamaFallbackConfigured, createOllamaHeaders, OllamaConfigurationError } from "./_ollama.js";
 import { createHash } from "node:crypto";
+import { enforceGuestUsage, getAccountAccess, GuestUsageError } from "./_guest-guard.js";
 
 const MAX_HISTORY_MESSAGES = 18;
 const MAX_MEMORY_ITEMS = 8;
@@ -6,17 +8,43 @@ const MAX_ATTACHMENTS = 10;
 const MAX_EXTRACTED_TEXT = 260_000;
 const OPENROUTER_KEY_PATTERN = /^sk-or-v1-[A-Za-z0-9_-]{16,}$/;
 const DEFAULT_MODEL = "openai/gpt-5.4-nano";
+const OPENROUTER_FALLBACK_STATUSES = new Set([402, 408, 429, 500, 502, 503, 504]);
+const SUPABASE_URL = "https://cxulgeojkjnskdyoktkj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475";
+const ACCOUNT_ROLES = new Map([
+  ["kantertal1@gmail.com", "owner"],
+  ["donotuseunlessyouaretalkanter@gmail.com", "owner_alt"],
+  ["supportaton@gmail.com", "support"]
+]);
 const SUPPORTED_MODELS = new Set([
+  "openai/gpt-5.4",
   DEFAULT_MODEL,
   "openai/gpt-4.1-mini",
+  "openai/gpt-5.4-mini",
   "anthropic/claude-3-haiku",
   "google/gemini-2.5-flash-lite",
+  "~google/gemini-flash-latest",
+  "microsoft/phi-4",
+  "cohere/command-r-08-2024",
+  "qwen/qwen-2.5-72b-instruct",
   "deepseek/deepseek-chat",
   "meta-llama/llama-3.1-8b-instruct",
   "mistralai/mistral-small-3.1-24b-instruct"
 ]);
 const MODEL_ALIASES = new Map([
-  ["google/gemini-pro", "google/gemini-2.5-flash-lite"]
+  ["google/gemini-pro", "google/gemini-2.5-flash-lite"],
+  ["google/gemini-flash-1.5", "~google/gemini-flash-latest"],
+  ["gemini-1.5-flash", "~google/gemini-flash-latest"],
+  ["microsoft/phi-3.5-mini-128k-instruct", "microsoft/phi-4"],
+  ["phi-3.5-mini", "microsoft/phi-4"],
+  ["command-r", "cohere/command-r-08-2024"],
+  ["qwen-2.5", "qwen/qwen-2.5-72b-instruct"]
+]);
+const FREE_MODELS = new Set([
+  DEFAULT_MODEL,
+  "deepseek/deepseek-chat",
+  "meta-llama/llama-3.1-8b-instruct",
+  "mistralai/mistral-small-3.1-24b-instruct"
 ]);
 
 export default async function handler(req, res) {
@@ -39,28 +67,75 @@ export default async function handler(req, res) {
     const {
       message,
       model,
-      mode,
       plan,
       timeZone,
       history = [],
       memory = [],
+      agent = null,
       attachments = []
     } = req.body || {};
-    const apiKey = getValidatedOpenRouterApiKey(requestId);
-    const openRouterHeaders = createOpenRouterHeaders(apiKey, req.headers.origin, requestId);
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required." });
     }
 
+    const usageDecision = await resolveChatUsage(req);
+    const usage = usageDecision.usage;
+    const accountAccess = usage.access;
+    const betaAccessApproved = accountAccess.betaApproved || await hasApprovedBetaAccess(req);
     const safeHistory = sanitizeHistory(history);
     const safeMemory = sanitizeMemory(memory);
+    const safeAgent = sanitizeAgent(agent);
     const safeAttachments = sanitizeAttachments(attachments);
     const userContent = createUserContent(message, safeAttachments);
     const hasPdf = safeAttachments.some(attachment => attachment.kind === "pdf");
-    const selectedModel = resolveModel(model);
+    const requestedModel = resolveModel(model);
+    const selectedModel = FREE_MODELS.has(requestedModel) || betaAccessApproved || accountAccess.allModels
+      ? requestedModel
+      : DEFAULT_MODEL;
     const userTimeZone = resolveTimeZone(timeZone);
     const requestTime = new Date(startedAt);
+    const systemPrompt = createSystemPrompt(accountAccess.plan || plan, safeMemory, requestTime, userTimeZone, safeAgent);
+    const openRouterMessages = [
+      { role: "system", content: systemPrompt },
+      ...safeHistory,
+      { role: "user", content: userContent }
+    ];
+
+    if (usesOllama(accountAccess) || model === "ollama/default" || usageDecision.fallbackReason) {
+      return await streamOllamaFallback({
+        res,
+        requestId,
+        usage,
+        systemPrompt,
+        history: safeHistory,
+        message,
+        attachments: safeAttachments,
+        signal: abortController.signal,
+        reason: usageDecision.fallbackReason || "",
+        startedAt
+      });
+    }
+
+    let apiKey;
+    try {
+      apiKey = getValidatedOpenRouterApiKey(requestId);
+    } catch (error) {
+      if (!accountAccess.paid || !isOllamaFallbackConfigured()) throw error;
+      return await streamOllamaFallback({
+        res,
+        requestId,
+        usage,
+        systemPrompt,
+        history: safeHistory,
+        message,
+        attachments: safeAttachments,
+        signal: abortController.signal,
+        reason: "primary-configuration",
+        startedAt
+      });
+    }
+    const openRouterHeaders = createOpenRouterHeaders(apiKey, req.headers.origin, requestId);
 
     logInfo(requestId, "Sending OpenRouter request", {
       requestedModel: typeof model === "string" ? model : "",
@@ -78,17 +153,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: selectedModel,
         stream: true,
-        messages: [
-          {
-            role: "system",
-            content: createSystemPrompt(mode, plan, safeMemory, requestTime, userTimeZone)
-          },
-          ...safeHistory,
-          {
-            role: "user",
-            content: userContent
-          }
-        ],
+        messages: openRouterMessages,
         ...(hasPdf ? {
           plugins: [{
             id: "file-parser",
@@ -107,6 +172,20 @@ export default async function handler(req, res) {
     });
 
     if (!upstream.ok) {
+      if (accountAccess.paid && OPENROUTER_FALLBACK_STATUSES.has(upstream.status)) {
+        return await streamOllamaFallback({
+          res,
+          requestId,
+          usage,
+          systemPrompt,
+          history: safeHistory,
+          message,
+          attachments: safeAttachments,
+          signal: abortController.signal,
+          reason: `openrouter-${upstream.status}`,
+          startedAt
+        });
+      }
       const errorData = await readErrorBody(upstream);
       return res.status(upstream.status).json({
         error: errorData?.error?.message || errorData?.message || `Model request failed (${upstream.status}).`
@@ -114,34 +193,29 @@ export default async function handler(req, res) {
     }
 
     if (!upstream.body) {
-      return res.status(502).json({ error: "The model returned an empty stream." });
+      return res.status(502).json({ error: "The model returned an empty response." });
     }
 
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache, no-transform");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    res.flushHeaders?.();
-
-    const reader = upstream.body.getReader();
-    let streamedBytes = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      streamedBytes += value.byteLength;
-      res.write(Buffer.from(value));
-    }
+    startEventStream(res, requestId, usage, {
+      provider: "openrouter",
+      model: selectedModel
+    });
+    const upstreamContentType = upstream.headers.get("content-type") || "";
+    const streamResult = upstreamContentType.includes("text/event-stream")
+      ? await relayOpenRouterStream(upstream.body, res)
+      : await relayOpenRouterJson(upstream, res);
 
     logInfo(requestId, "OpenRouter stream completed", {
-      streamedBytes,
+      streamedBytes: streamResult.bytes,
+      emittedCharacters: streamResult.characters,
+      upstreamCompleted: streamResult.completed,
       elapsedMs: Date.now() - startedAt
     });
+    if (!streamResult.completed) writeSseData(res, "[DONE]");
     res.end();
   } catch (error) {
     if (error?.name === "AbortError") {
-      logInfo(requestId, "OpenRouter request aborted", {
+      logInfo(requestId, "Chat request aborted", {
         elapsedMs: Date.now() - startedAt
       });
       if (!res.writableEnded) res.end();
@@ -159,8 +233,16 @@ export default async function handler(req, res) {
       return res.end();
     }
 
-    if (error instanceof ChatConfigurationError) {
-      return res.status(500).json({
+    if (error instanceof ChatConfigurationError || error instanceof OllamaConfigurationError) {
+      return res.status(error.status || 500).json({
+        error: error.message,
+        code: error.code,
+        requestId
+      });
+    }
+
+    if (error instanceof GuestUsageError) {
+      return res.status(error.status).json({
         error: error.message,
         code: error.code,
         requestId
@@ -174,11 +256,357 @@ export default async function handler(req, res) {
   }
 }
 
+function startEventStream(res, requestId, usage, { provider = "openrouter", model = "", fallbackReason = "" } = {}) {
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("X-Request-Id", requestId);
+  res.setHeader("X-Talkaton-Provider", provider);
+  if (model) res.setHeader("X-Talkaton-Model", model);
+  if (fallbackReason) res.setHeader("X-Talkaton-Fallback", fallbackReason);
+  setUsageHeaders(res, usage, "messages");
+  res.flushHeaders?.();
+  res.write(": connected\n\n");
+}
+
+function setUsageHeaders(res, usage, feature) {
+  const limit = usage?.access?.limits?.[feature];
+  const remaining = usage?.remaining;
+  res.setHeader("X-Talkaton-Plan", String(usage?.access?.plan || "guest"));
+  res.setHeader("X-Talkaton-Usage-Feature", feature);
+  res.setHeader("X-Talkaton-Usage-Limit", Number.isFinite(limit) ? String(limit) : "unlimited");
+  res.setHeader("X-Talkaton-Usage-Remaining", Number.isFinite(remaining) ? String(remaining) : "unlimited");
+}
+
+async function resolveChatUsage(req) {
+  try {
+    return { usage: await enforceGuestUsage(req, "messages"), fallbackReason: "" };
+  } catch (error) {
+    if (!(error instanceof GuestUsageError) || error.code !== "PLAN_LIMIT_REACHED") throw error;
+    const access = await getAccountAccess(req);
+    if (!access.paid) throw error;
+    return {
+      usage: {
+        guest: false,
+        allowed: true,
+        used: Number(access.limits?.messages) || 0,
+        remaining: 0,
+        access
+      },
+      fallbackReason: "paid-plan-overflow"
+    };
+  }
+}
+
+async function streamOllamaFallback({
+  res,
+  requestId,
+  usage,
+  systemPrompt,
+  history,
+  message,
+  attachments,
+  signal,
+  reason,
+  startedAt
+}) {
+  const config = getOllamaFallbackConfig();
+  const modelLabel = `ollama/${config.model}`;
+  const upstream = await fetch(`${config.baseUrl}/chat`, {
+    method: "POST",
+    headers: createOllamaHeaders(config.apiKey),
+    signal,
+    body: JSON.stringify({
+      model: config.model,
+      stream: true,
+      think: false,
+      messages: createOllamaMessages(systemPrompt, history, message, attachments)
+    })
+  });
+
+  logInfo(requestId, "Ollama fallback response received", {
+    status: upstream.status,
+    ok: upstream.ok,
+    model: config.model,
+    reason,
+    elapsedMs: Date.now() - startedAt
+  });
+
+  if (!upstream.ok) {
+    const errorData = await readErrorBody(upstream);
+    logError(
+      requestId,
+      "Ollama fallback failed",
+      new Error(errorData?.error || errorData?.message || `HTTP ${upstream.status}`),
+      { status: upstream.status, reason }
+    );
+    return res.status(502).json({
+      error: "Ollama is temporarily unavailable. Please try again shortly.",
+      code: "OLLAMA_FALLBACK_UNAVAILABLE",
+      requestId
+    });
+  }
+
+  if (!upstream.body) {
+    return res.status(502).json({
+      error: "Ollama returned an empty response.",
+      code: "OLLAMA_FALLBACK_EMPTY",
+      requestId
+    });
+  }
+
+  startEventStream(res, requestId, usage, {
+    provider: "ollama",
+    model: modelLabel,
+    fallbackReason: reason
+  });
+  const contentType = upstream.headers.get("content-type") || "";
+  const streamResult = contentType.includes("application/json") && !contentType.includes("ndjson")
+    ? await relayOllamaJson(upstream, res, modelLabel)
+    : await relayOllamaStream(upstream.body, res, modelLabel);
+  if (!streamResult.completed) writeSseData(res, "[DONE]");
+  res.end();
+}
+
+function createOllamaMessages(systemPrompt, history, message, attachments) {
+  return [
+    { role: "system", content: systemPrompt },
+    ...history.map(item => ({ role: item.role, content: item.content })),
+    createOllamaUserMessage(message, attachments)
+  ];
+}
+
+function createOllamaUserMessage(message, attachments) {
+  const context = [];
+  const images = [];
+  for (const attachment of attachments) {
+    if (attachment.kind === "image" && attachment.dataUrl) {
+      const base64 = attachment.dataUrl.split(",", 2)[1] || "";
+      if (base64) images.push(base64);
+    }
+    if (attachment.extractedText) {
+      context.push(`--- Attached file: ${attachment.name} (${attachment.type}) ---\n${attachment.extractedText}`);
+    } else if (attachment.kind !== "image") {
+      context.push(`[Attached file: ${attachment.name}; no extracted text was available to Ollama.]`);
+    }
+  }
+  return {
+    role: "user",
+    content: [message, ...context].join("\n\n"),
+    ...(images.length ? { images } : {})
+  };
+}
+
+async function relayOllamaStream(body, res, modelLabel) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let bytes = 0;
+  let characters = 0;
+  let completed = false;
+
+  while (!completed) {
+    const { done, value } = await reader.read();
+    if (done) {
+      buffer += decoder.decode();
+      break;
+    }
+    bytes += value.byteLength;
+    buffer += decoder.decode(value, { stream: true });
+    const parsed = consumeOllamaLines(buffer, res, modelLabel);
+    buffer = parsed.remainder;
+    characters += parsed.characters;
+    completed = parsed.completed;
+  }
+  if (!completed && buffer.trim()) {
+    const parsed = consumeOllamaLines(`${buffer}\n`, res, modelLabel);
+    characters += parsed.characters;
+    completed = parsed.completed;
+  }
+  return { bytes, characters, completed };
+}
+
+function consumeOllamaLines(source, res, modelLabel) {
+  const lines = source.split(/\r?\n/);
+  const remainder = lines.pop() || "";
+  let characters = 0;
+  let completed = false;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let payload;
+    try {
+      payload = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (payload?.error) {
+      writeSseData(res, JSON.stringify({ error: { message: "The Ollama backup stream was interrupted." } }));
+      writeSseData(res, "[DONE]");
+      completed = true;
+      break;
+    }
+    const text = String(payload?.message?.content || payload?.response || "");
+    if (text) {
+      characters += text.length;
+      writeSseData(res, JSON.stringify({
+        model: modelLabel,
+        choices: [{ delta: { content: text } }]
+      }));
+    }
+    if (payload?.done) {
+      writeSseData(res, "[DONE]");
+      completed = true;
+      break;
+    }
+  }
+  return { remainder, characters, completed };
+}
+
+async function relayOllamaJson(upstream, res, modelLabel) {
+  const raw = await upstream.text();
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    throw new Error("The Ollama backup returned an unreadable response.");
+  }
+  const text = String(payload?.message?.content || payload?.response || "");
+  if (!text) throw new Error("The Ollama backup returned an empty response.");
+  writeSseData(res, JSON.stringify({
+    model: modelLabel,
+    choices: [{ delta: { content: text } }]
+  }));
+  writeSseData(res, "[DONE]");
+  return { bytes: Buffer.byteLength(raw), characters: text.length, completed: true };
+}
+
+async function relayOpenRouterStream(body, res) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let bytes = 0;
+  let characters = 0;
+  let completed = false;
+
+  while (!completed) {
+    const { done, value } = await reader.read();
+    if (done) {
+      buffer += decoder.decode();
+      break;
+    }
+    bytes += value.byteLength;
+    buffer += decoder.decode(value, { stream: true });
+    const parsed = consumeUpstreamEvents(buffer, res);
+    buffer = parsed.remainder;
+    characters += parsed.characters;
+    completed = parsed.completed;
+  }
+
+  if (!completed && buffer.trim()) {
+    const parsed = consumeUpstreamEvents(`${buffer}\n\n`, res);
+    characters += parsed.characters;
+    completed = parsed.completed;
+  }
+
+  return { bytes, characters, completed };
+}
+
+function consumeUpstreamEvents(source, res) {
+  const events = source.split(/\r?\n\r?\n/);
+  const remainder = events.pop() || "";
+  let characters = 0;
+  let completed = false;
+
+  for (const event of events) {
+    const data = event.split(/\r?\n/)
+      .filter(line => line.startsWith("data:"))
+      .map(line => line.slice(5).trimStart())
+      .join("\n")
+      .trim();
+    if (!data) continue;
+    if (data === "[DONE]") {
+      writeSseData(res, "[DONE]");
+      completed = true;
+      break;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (payload?.error) {
+      const message = payload.error.message || payload.message || "The model stream failed.";
+      writeSseData(res, JSON.stringify({ error: { message } }));
+      writeSseData(res, "[DONE]");
+      completed = true;
+      break;
+    }
+    const text = extractAssistantText(payload);
+    if (!text) continue;
+    characters += text.length;
+    writeSseData(res, JSON.stringify({
+      id: payload.id,
+      model: payload.model,
+      choices: [{ delta: { content: text } }]
+    }));
+  }
+
+  return { remainder, characters, completed };
+}
+
+async function relayOpenRouterJson(upstream, res) {
+  const raw = await upstream.text();
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    throw new Error("The model returned an unreadable response.");
+  }
+  if (payload?.error) throw new Error(payload.error.message || payload.message || "The model request failed.");
+  const text = extractAssistantText(payload);
+  if (!text) throw new Error("The model returned an empty response.");
+  writeSseData(res, JSON.stringify({
+    id: payload.id,
+    model: payload.model,
+    choices: [{ delta: { content: text } }]
+  }));
+  writeSseData(res, "[DONE]");
+  return { bytes: Buffer.byteLength(raw), characters: text.length, completed: true };
+}
+
+function extractAssistantText(payload) {
+  const choice = payload?.choices?.[0];
+  return extractText(choice?.delta?.content)
+    || extractText(choice?.message?.content)
+    || extractText(payload?.output_text)
+    || extractText(payload?.response?.output_text);
+}
+
+function extractText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map(part => {
+    if (typeof part === "string") return part;
+    if (!part || typeof part !== "object") return "";
+    if (["text", "output_text"].includes(part.type) && typeof part.text === "string") return part.text;
+    return "";
+  }).join("");
+}
+
+function writeSseData(res, data) {
+  res.write(`data: ${data}\n\n`);
+}
+
 class ChatConfigurationError extends Error {
-  constructor(message, code, cause) {
+  constructor(message, code, cause, status = 500) {
     super(message, cause ? { cause } : undefined);
     this.name = "ChatConfigurationError";
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -414,7 +842,35 @@ function createUserContent(message, attachments) {
   return content;
 }
 
-function createSystemPrompt(mode, plan, memory, requestTime, timeZone) {
+function sanitizeAgent(agent) {
+  if (!agent || typeof agent !== "object") return null;
+  const name = typeof agent.name === "string" ? agent.name.trim().slice(0, 60) : "";
+  const instructions = typeof agent.instructions === "string"
+    ? agent.instructions.trim().slice(0, 12_000)
+    : "";
+  if (!name || !instructions) return null;
+
+  const allowedTools = new Set(["web", "images", "files", "python", "canvas"]);
+  const tools = Array.isArray(agent.tools)
+    ? [...new Set(agent.tools.map(tool => String(tool || "").trim()).filter(tool => allowedTools.has(tool)))]
+    : [];
+  let remainingKnowledge = 80_000;
+  const knowledge = Array.isArray(agent.knowledge)
+    ? agent.knowledge.slice(0, 8).flatMap(item => {
+      if (!item || typeof item !== "object" || remainingKnowledge <= 0) return [];
+      const itemName = String(item.name || "Knowledge file").trim().slice(0, 120);
+      const rawText = String(item.text || item.extractedText || "").trim();
+      if (!rawText) return [];
+      const text = rawText.slice(0, Math.min(remainingKnowledge, 24_000));
+      remainingKnowledge -= text.length;
+      return [{ name: itemName, text }];
+    })
+    : [];
+
+  return { name, instructions, tools, knowledge };
+}
+
+function createSystemPrompt(plan, memory, requestTime, timeZone, agent = null) {
   const localDate = new Intl.DateTimeFormat("en-US", {
     dateStyle: "full",
     timeZone
@@ -424,12 +880,16 @@ function createSystemPrompt(mode, plan, memory, requestTime, timeZone) {
     timeZone
   }).format(requestTime);
 
-  return `You are Talkaton.
+  const assistantIdentity = agent
+    ? `You are ${agent.name}, an AI assistant running on Talkaton.`
+    : "You are Talkaton.";
+
+  return `${assistantIdentity}
 
 Product identity:
 - Talkaton (talkaton.org) is a standalone, multi-model Web AI Dashboard.
 - It aggregates AI models including GPT, Claude, Gemini, and DeepSeek.
-- Its product features include Chaos Mode and memory dashboards.
+- Its product features include multi-model switching, live tools, and memory dashboards.
 - Never confuse Talkaton with "Talkatone," the unrelated VoIP calling app.
 - Never describe Talkaton as a calling, phone, texting, or VoIP service.
 
@@ -456,9 +916,96 @@ Current time:
 - Treat this request timestamp as the authoritative current moment. Interpret relative dates such as today, tomorrow, and yesterday in the user's timezone.
 - Knowing the current time does not guarantee knowledge of events that happened after your training data. Be honest when live information would require search.
 
-Current mode: ${mode || "Normal"}.
-Current plan: ${plan === "dev" ? "dev (unlimited access to all features and models)" : plan === "free" ? "free (standard access with limited models)" : "guest (limited access, GPT-5.4 Nano only)"}.
-${memory.length ? `Useful memory:\n${memory.join("\n\n")}` : ""}`;
+Current plan: ${describePlan(plan)}.
+${memory.length ? `Useful memory:\n${memory.join("\n\n")}` : ""}
+${agent ? `\nActive custom agent: ${agent.name}
+Follow these user-authored agent instructions unless they conflict with safety, platform rules, or the user's current request:
+${agent.instructions}
+Enabled agent tools: ${agent.tools.length ? agent.tools.join(", ") : "none"}.
+${agent.knowledge.length ? `Agent knowledge store:\n${agent.knowledge.map(item => `--- ${item.name} ---\n${item.text}`).join("\n\n")}` : ""}` : ""}`;
+}
+
+async function hasApprovedBetaAccess(req) {
+  const authorization = typeof req.headers.authorization === "string"
+    ? req.headers.authorization
+    : "";
+  if (!/^Bearer\s+\S+$/i.test(authorization)) return false;
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: authorization
+      }
+    });
+    if (!response.ok) return false;
+    const user = await response.json();
+    if (user?.app_metadata?.beta === true || user?.app_metadata?.beta_approved === true) return true;
+
+    const email = String(user?.email || "").trim().toLowerCase();
+    if (ACCOUNT_ROLES.has(email)) return true;
+    if (email && getApprovedBetaEmails().has(email)) return true;
+    return hasApprovedBetaRequest(authorization, user?.id);
+  } catch {
+    return false;
+  }
+}
+
+async function hasApprovedBetaRequest(authorization, userId) {
+  if (!userId) return false;
+  try {
+    const url = new URL(`${SUPABASE_URL}/rest/v1/beta_requests`);
+    url.searchParams.set("select", "id,access_expires_at");
+    url.searchParams.set("user_id", `eq.${userId}`);
+    url.searchParams.set("feature_key", "eq.beta_lab");
+    url.searchParams.set("status", "eq.approved");
+    url.searchParams.set("limit", "1");
+    let response = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: authorization
+      }
+    });
+    if (!response.ok) {
+      url.searchParams.set("select", "id");
+      response = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: authorization
+        }
+      });
+    }
+    if (!response.ok) return false;
+    const data = await response.json();
+    return Array.isArray(data) && data.some(grant => {
+      if (!grant?.access_expires_at) return true;
+      const expiresAt = new Date(grant.access_expires_at).getTime();
+      return Number.isFinite(expiresAt) && expiresAt > Date.now();
+    });
+  } catch {
+    return false;
+  }
+}
+
+function getApprovedBetaEmails() {
+  return new Set(
+    String(process.env.BETA_APPROVED_EMAILS || "")
+      .split(/[\s,;]+/)
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function describePlan(plan) {
+  if (plan === "owner") return "owner (unlimited access to all features and models)";
+  if (plan === "owner_alt") return "alternate owner account (unlimited access to all features and models)";
+  if (plan === "support") return "support (unlimited access to all features and models)";
+  if (plan === "dev") return "trusted beta developer (unlimited messages, images, and web searches)";
+  if (plan === "plus") return "Talkaton Plus (all 12 models with expanded daily messages, images, and web searches)";
+  if (plan === "pro") return "Talkaton Pro (all 12 models with high daily messages, images, and web searches)";
+  if (plan === "max") return "Talkaton Max (all 12 models with Talkaton's highest paid daily limits)";
+  if (plan === "free") return "free (standard access with Ollama)";
+  return "guest (limited access, Ollama)";
 }
 
 function resolveTimeZone(timeZone) {

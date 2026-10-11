@@ -1,0 +1,61 @@
+{
+  "name": "feather-browser",
+  "version": "0.1.0",
+  "description": "A focused, lightweight Chromium web browser.",
+  "private": true,
+  "main": "main.cjs",
+  "author": "Talkaton",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "test:smoke": "electron . --smoke-test",
+    "build:mac": "electron-builder --mac dmg --universal",
+    "build:windows": "electron-builder --win nsis --x64",
+    "build:linux": "electron-builder --linux AppImage --x64"
+  },
+  "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "org.talkaton.feather",
+    "productName": "Feather Browser",
+    "asar": true,
+    "compression": "maximum",
+    "electronLanguages": ["en-US"],
+    "directories": {
+      "output": "../../downloads/installers/feather"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "shared.cjs",
+      "newtab.html",
+      "offline.html",
+      "offline.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "artifactName": "Feather-Browser-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [{ "target": "dmg", "arch": ["universal"] }]
+    },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "linux": {
+      "category": "Network",
+      "target": ["AppImage"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Feather Browser"
+    }
+  }
+}

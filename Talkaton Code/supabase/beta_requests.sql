@@ -3,7 +3,7 @@
 
 create table if not exists public.beta_requests (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
   user_email text not null,
   requester_name text not null,
   feature_key text not null,
@@ -46,6 +46,29 @@ create index if not exists idx_beta_requests_status_created
 
 alter table public.beta_requests enable row level security;
 
+create or replace function public.is_talkaton_reviewer()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from auth.users
+    where id = auth.uid()
+      and email_confirmed_at is not null
+      and lower(email) in (
+        'supportaton@gmail.com',
+        'kantertal1@gmail.com',
+        'donotuseunlessyouaretalkanter@gmail.com'
+      )
+  );
+$$;
+
+revoke all on function public.is_talkaton_reviewer() from public, anon;
+grant execute on function public.is_talkaton_reviewer() to authenticated;
+
 create or replace function public.has_active_beta_access(p_user_id uuid)
 returns boolean
 language sql
@@ -85,17 +108,12 @@ create policy "Users can submit their own requests"
     and reviewed_by is null
     and reviewed_at is null
     and access_expires_at is null
-    and (
-      feature_key <> 'dev_access'
-      or public.has_active_beta_access(auth.uid())
-      or coalesce(auth.jwt() -> 'app_metadata' ->> 'beta', 'false') = 'true'
-      or coalesce(auth.jwt() -> 'app_metadata' ->> 'beta_approved', 'false') = 'true'
-    )
   );
 
 create policy "Users can view their own requests"
   on public.beta_requests
   for select
+  to authenticated
   using (auth.uid() = user_id);
 
 create policy "Users can delete their pending requests"
@@ -103,31 +121,86 @@ create policy "Users can delete their pending requests"
   for delete
   using (auth.uid() = user_id and status = 'pending');
 
+create or replace function public.submit_dev_access_request(
+  p_requester_name text,
+  p_user_email text,
+  p_title text,
+  p_details text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_email text;
+  v_request_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Log in to a confirmed Talkaton account before requesting Dev Access.';
+  end if;
+
+  v_email := lower(trim(coalesce(auth.jwt() ->> 'email', '')));
+
+  if char_length(trim(coalesce(p_requester_name, ''))) not between 1 and 80 then
+    raise exception 'Enter your name.';
+  end if;
+  if v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+    or char_length(v_email) > 160 then
+    raise exception 'Enter a valid email address.';
+  end if;
+  if char_length(trim(coalesce(p_title, ''))) not between 3 and 120 then
+    raise exception 'Enter a Dev Access request title.';
+  end if;
+  if char_length(trim(coalesce(p_details, ''))) not between 10 and 2000 then
+    raise exception 'Explain why you need Dev Access.';
+  end if;
+  if exists (
+    select 1
+    from public.beta_requests
+    where lower(user_email) = v_email
+      and feature_key = 'dev_access'
+      and status = 'pending'
+  ) then
+    raise exception 'A Dev Access request for this email is already pending.';
+  end if;
+
+  insert into public.beta_requests (
+    user_id,
+    user_email,
+    requester_name,
+    feature_key,
+    title,
+    details
+  )
+  values (
+    auth.uid(),
+    v_email,
+    trim(p_requester_name),
+    'dev_access',
+    trim(p_title),
+    trim(p_details)
+  )
+  returning id into v_request_id;
+
+  return v_request_id;
+end;
+$$;
+
+revoke all on function public.submit_dev_access_request(text, text, text, text) from public;
+revoke execute on function public.submit_dev_access_request(text, text, text, text) from anon;
+grant execute on function public.submit_dev_access_request(text, text, text, text) to authenticated;
+
 create policy "Support and owner can view all requests"
   on public.beta_requests
   for select
-  using (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in (
-      'supportaton@gmail.com',
-      'kantertal1@gmail.com'
-    )
-  );
+  using (public.is_talkaton_reviewer());
 
 create policy "Support and owner can review requests"
   on public.beta_requests
   for update
-  using (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in (
-      'supportaton@gmail.com',
-      'kantertal1@gmail.com'
-    )
-  )
-  with check (
-    lower(coalesce(auth.jwt() ->> 'email', '')) in (
-      'supportaton@gmail.com',
-      'kantertal1@gmail.com'
-    )
-  );
+  using (public.is_talkaton_reviewer())
+  with check (public.is_talkaton_reviewer());
 
 create or replace function public.set_beta_request_updated_at()
 returns trigger

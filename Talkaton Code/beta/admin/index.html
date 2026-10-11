@@ -38,7 +38,7 @@
         <strong>Checking support access…</strong>
         <p>
           supportaton@gmail.com is the only Support account.
-          kantertal1@gmail.com can also enter through its separate Owner permissions.
+          kantertal1@gmail.com and the Owner Alt Account can also enter through their separate Owner permissions.
         </p>
         <a class="betaPrimaryBtn" href="/chat?auth=login">Log in to Talkaton</a>
       </section>
@@ -58,17 +58,27 @@
         <p class="betaAdminStatus" id="adminStatus" role="status" aria-live="polite"></p>
         <div class="betaAdminRequestList" id="adminRequestList"></div>
 
-        <details class="betaReviewedArchive" id="adminReviewedArchive">
+        <div class="betaReviewedArchives" aria-label="Reviewed request archives">
+        <details class="betaReviewedArchive approvedArchive" id="adminApprovedArchive">
           <summary>
-            <span>Approved or declined</span>
-            <span class="betaReviewedCount" id="adminReviewedCount">0</span>
+            <span>Approved</span>
+            <span class="betaReviewedCount" id="adminApprovedCount">0</span>
           </summary>
-          <div class="betaReviewedList" id="adminReviewedList"></div>
+          <div class="betaReviewedList" id="adminApprovedList"></div>
         </details>
+        <details class="betaReviewedArchive declinedArchive" id="adminDeclinedArchive">
+          <summary>
+            <span>Declined</span>
+            <span class="betaReviewedCount" id="adminDeclinedCount">0</span>
+          </summary>
+          <div class="betaReviewedList" id="adminDeclinedList"></div>
+        </details>
+        </div>
       </section>
     </main>
   </div>
 
-  <script type="module" src="/beta/admin/app.js?v=20260728-reviewed-archive21"></script>
+  <script src="/vendor/supabase-2.57.4.min.js"></script>
+  <script type="module" src="/beta/admin/app.js?v=20260828-owner-alt1"></script>
 </body>
 </html>

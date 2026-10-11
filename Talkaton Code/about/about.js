@@ -1,9 +1,9 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const createClient = globalThis.supabase?.createClient;
 
-const supabase=createClient(
+const supabase=typeof createClient==="function" ? createClient(
 "https://cxulgeojkjnskdyoktkj.supabase.co",
 "sb_publishable_GgxtfIaIamzZFY_jMU4_Cw_V8NKm475"
-);
+) : null;
 
 const visitorCount=document.getElementById("visitorCount");
 
@@ -11,6 +11,7 @@ updateVisitorCounter();
 
 async function updateVisitorCounter(){
 try{
+if(!supabase)throw new Error("Talkaton account service did not load");
 const {data,error}=await supabase.rpc("record_unique_visit",{
 p_visitor_id:getVisitorId()
 });
