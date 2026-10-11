@@ -1,4 +1,4 @@
-const CACHE_NAME = "codeaton-t1791677714200";
+const CACHE_NAME = "codeaton-t1791678053719";
 const SHELL = [
   "/codeaton",
   "/codeaton/style.css?v=20260809-codeaton3",

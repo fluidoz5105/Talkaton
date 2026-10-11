@@ -1,4 +1,4 @@
-const CACHE_NAME = "talkaton-t1791677714200";
+const CACHE_NAME = "talkaton-t1791678053719";
 const ASSET_VERSION = "20260827-code-agent2";
 const versioned = path => `${path}?v=${ASSET_VERSION}`;
 

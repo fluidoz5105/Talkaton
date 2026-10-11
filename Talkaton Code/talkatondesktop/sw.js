@@ -1,4 +1,4 @@
-const CACHE_NAME = "talkaton-desktop-t1791677714200";
+const CACHE_NAME = "talkaton-desktop-t1791678053719";
 const SHELL = [
   "/talkatondesktop",
   "/talkatondesktop/style.css?v=20260809-native1",

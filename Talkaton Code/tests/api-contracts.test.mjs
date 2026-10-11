@@ -17,7 +17,7 @@ async function importSource(relativePath) {
   let source = await readFile(new URL(relativePath, root), "utf8");
   for (const dependency of ["_guest-guard", "_ollama"]) {
     if (source.includes(`./${dependency}.js`)) {
-      const dependencySource = await readFile(new URL(`api/${dependency}.js`, root), "utf8");
+      const dependencySource = await readFile(new URL(`server/${dependency}.js`, root), "utf8");
       source = source.replace(`./${dependency}.js`, `data:text/javascript;base64,${Buffer.from(dependencySource).toString("base64")}`);
     }
   }
@@ -94,7 +94,7 @@ test("chat API streams a valid OpenRouter response", async () => {
     });
   };
 
-  const { default: handler } = await importSource("api/chat.js");
+  const { default: handler } = await importSource("server/chat.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -201,7 +201,7 @@ test("paid chat continues on Ollama after the premium-model allowance is used", 
   };
 
   try {
-    const { default: handler } = await importSource("api/chat.js");
+    const { default: handler } = await importSource("server/chat.js");
     const response = createResponse();
     await handler({
       method: "POST",
@@ -260,7 +260,7 @@ test("chat API gives Codeaton its own generated assistant identity", async () =>
     });
   };
 
-  const { default: handler } = await importSource("api/chat.js");
+  const { default: handler } = await importSource("server/chat.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -307,7 +307,7 @@ test("chat API normalizes structured streaming content and ignores provider comm
     );
   };
 
-  const { default: handler } = await importSource("api/chat.js");
+  const { default: handler } = await importSource("server/chat.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -342,7 +342,7 @@ test("chat API converts a non-streaming provider reply into the streaming contra
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
 
-  const { default: handler } = await importSource("api/chat.js");
+  const { default: handler } = await importSource("server/chat.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -376,7 +376,7 @@ test("chat API reports a missing OpenRouter key clearly", async () => {
     throw new Error(`Missing-key test made an unexpected request: ${url}`);
   };
   try {
-    const { default: handler } = await importSource("api/chat.js");
+    const { default: handler } = await importSource("server/chat.js");
     const response = createResponse();
     await handler({
       method: "POST",
@@ -427,7 +427,7 @@ test("search API grounds an OpenRouter answer in Tavily results", async () => {
     });
   };
 
-  const { default: handler } = await importSource("api/search.js");
+  const { default: handler } = await importSource("server/search.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -465,7 +465,7 @@ test("image API rejects an empty prompt without spending an API request", async 
     throw new Error("fetch should not be called");
   };
 
-  const { default: handler } = await importSource("api/image.js");
+  const { default: handler } = await importSource("server/image.js");
   const response = createResponse();
   await handler({ method: "POST", body: { prompt: "  " } }, response);
 
@@ -511,7 +511,7 @@ test("image API pairs generated pixels with Ollama commentary", async () => {
     throw new Error(`Unexpected image API request: ${target}`);
   };
 
-  const { default: handler } = await importSource("api/image.js");
+  const { default: handler } = await importSource("server/image.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -550,7 +550,7 @@ test("guest APIs enforce a server-side daily limit", async () => {
     throw new Error("upstream API should not be called");
   };
 
-  const { default: handler } = await importSource("api/search.js");
+  const { default: handler } = await importSource("server/search.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -573,7 +573,7 @@ test("automated bot traffic is blocked before an upstream request", async () => 
     throw new Error("fetch should not be called");
   };
 
-  const { default: handler } = await importSource("api/search.js");
+  const { default: handler } = await importSource("server/search.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -609,7 +609,7 @@ test("voice API transcribes recorded browser audio through OpenAI", async () => 
     });
   };
 
-  const { default: handler } = await importSource("api/transcribe.js");
+  const { default: handler } = await importSource("server/transcribe.js");
   const response = createResponse();
   await handler({
     method: "POST",
@@ -631,7 +631,7 @@ test("voice API transcribes recorded browser audio through OpenAI", async () => 
 });
 
 test("Beta status requires a session and grants owner access", async () => {
-  const { default: handler } = await importSource("api/beta-status.js");
+  const { default: handler } = await importSource("server/beta-status.js");
 
   const anonymousResponse = createResponse();
   await handler({ method: "GET", headers: {} }, anonymousResponse);
@@ -692,7 +692,7 @@ test("alternate owner account receives unlimited server-side access", async () =
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
 
-  const { getAccountAccess } = await importSource("api/_guest-guard.js");
+  const { getAccountAccess } = await importSource("server/_guest-guard.js");
   const access = await getAccountAccess({
     headers: { authorization: "Bearer alternate-owner-session" }
   });
@@ -709,8 +709,8 @@ test("alternate owner account receives unlimited server-side access", async () =
 
 test("subscription checkout stays on the billing domain and requires a confirmed account", async () => {
   const [checkout, portal, subscriptionApp, chatApp] = await Promise.all([
-    readFile(new URL("api/billing-checkout.js", root), "utf8"),
-    readFile(new URL("api/billing-portal.js", root), "utf8"),
+    readFile(new URL("server/billing-checkout.js", root), "utf8"),
+    readFile(new URL("server/billing-portal.js", root), "utf8"),
     readFile(new URL("subscriptions/app.js", root), "utf8"),
     readFile(new URL("chat/app.js", root), "utf8")
   ]);
@@ -768,7 +768,7 @@ test("production subscription checkout rejects sandbox keys and creates verified
       throw new Error(`Sandbox checkout made an unexpected request: ${url}`);
     };
 
-    const sandboxModule = await importSource("api/billing-checkout.js");
+    const sandboxModule = await importSource("server/billing-checkout.js");
     const sandboxResponse = createResponse();
     await sandboxModule.default({
       method: "POST",
@@ -819,7 +819,7 @@ test("production subscription checkout rejects sandbox keys and creates verified
       throw new Error(`Unexpected live checkout request: ${target}`);
     };
 
-    const liveModule = await importSource("api/billing-checkout.js");
+    const liveModule = await importSource("server/billing-checkout.js");
     const liveResponse = createResponse();
     await liveModule.default({
       method: "POST",
@@ -847,7 +847,7 @@ test("production subscription checkout rejects sandbox keys and creates verified
 
 test("Realtime voice exchanges SDP server-side without exposing the OpenAI key", async () => {
   const [realtimeApi, realtimeClient, nativeVoice] = await Promise.all([
-    readFile(new URL("api/realtime-session.js", root), "utf8"),
+    readFile(new URL("server/realtime-session.js", root), "utf8"),
     readFile(new URL("chat/realtime-voice.js", root), "utf8"),
     readFile(new URL("modules/native-voice.js", root), "utf8")
   ]);

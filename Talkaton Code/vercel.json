@@ -1,7 +1,7 @@
 {
   "cleanUrls": true,
   "buildCommand": "npm run build",
-  "outputDirectory": ".",
+  "outputDirectory": ".build-cache/public",
   "redirects": [
     {
       "source": "/",
@@ -16,6 +16,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/:endpoint",
+      "destination": "/api/index?endpoint=:endpoint"
+    },
     {
       "source": "/missing-out",
       "has": [
@@ -120,29 +124,53 @@
     {
       "source": "/downloads/installers/Talkaton-1.0.0-mac-universal.dmg",
       "headers": [
-        { "key": "Content-Disposition", "value": "attachment; filename=\"Talkaton-1.0.0-mac-universal.dmg\"" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Talkaton-1.0.0-mac-universal.dmg\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {
       "source": "/downloads/installers/Talkaton-1.0.0-windows-x64-setup.exe",
       "headers": [
-        { "key": "Content-Disposition", "value": "attachment; filename=\"Talkaton-1.0.0-windows-x64-setup.exe\"" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Talkaton-1.0.0-windows-x64-setup.exe\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {
       "source": "/downloads/installers/Codeaton-1.0.0-mac-universal.dmg",
       "headers": [
-        { "key": "Content-Disposition", "value": "attachment; filename=\"Codeaton-1.0.0-mac-universal.dmg\"" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Codeaton-1.0.0-mac-universal.dmg\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {
       "source": "/downloads/installers/Codeaton-1.0.0-windows-x64-setup.exe",
       "headers": [
-        { "key": "Content-Disposition", "value": "attachment; filename=\"Codeaton-1.0.0-windows-x64-setup.exe\"" },
-        { "key": "Cache-Control", "value": "public, max-age=3600" }
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"Codeaton-1.0.0-windows-x64-setup.exe\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     },
     {

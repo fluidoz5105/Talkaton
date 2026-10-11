@@ -9,7 +9,7 @@ Production Vercel project: `talkaton-tokn` (`prj_lYtFuMMZ4TUz9yOgXI01adXO72g1`),
 2. From the app directory run `npm test` and `npm run build`. The build updates service-worker cache versions.
 3. Review the diff and commit the intended source changes. Never commit `.env.local`, `.vercel`, keys, or build caches.
 4. Push the commit to GitHub. Use a branch preview until the required production services are configured.
-5. In the existing Vercel project's Settings → Git, connect `fluidoz5105/Talkaton`; production branch `main`. In Build settings set Root Directory to `Talkaton Code`, build command `npm run build`, output directory `.`.
+5. In the existing Vercel project's Settings → Git, connect `fluidoz5105/Talkaton`; production branch `main`. In Build settings set Root Directory to `Talkaton Code`, build command `npm run build`, output directory `.build-cache/public`.
 6. Verify the Vercel deployment is READY and its Git commit SHA matches the pushed commit. Test Guest and signed-in Free chat, paid chat, login emails, and existing downloads before production promotion.
 
 Never publish a local-only Vercel upload. Every deployment must refer to a pushed Git commit. Do not replace the existing domain/project with a new project.
@@ -40,3 +40,5 @@ The existing Supabase signup, magic-link login, confirmation resend and password
 The hook verifies raw-body HMAC signatures with a five-minute tolerance, restricts redirects to Talkaton origins, sends both secure-email-change confirmations, and uses per-event idempotency keys. It never returns or logs email tokens, keys, or Resend error bodies. No live email is sent by the automated tests.
 
 References: https://docs.ollama.com/cloud, https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook, https://resend.com/docs/api-reference/emails/send-email.
+
+The API has one Vercel entry point (`api/index.js`), with existing URLs rewritten to server-only handlers in `server/`, so the deployment stays within the Hobby function count. The build publishes a separate public asset directory.

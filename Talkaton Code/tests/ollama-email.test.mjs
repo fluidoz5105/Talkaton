@@ -5,9 +5,9 @@ import { createHmac } from "node:crypto";
 import { Readable } from "node:stream";
 
 async function load(name) {
-  let source = await readFile(new URL(`../api/${name}.js`, import.meta.url), "utf8");
+  let source = await readFile(new URL(`../server/${name}.js`, import.meta.url), "utf8");
   for (const dep of ["_guest-guard", "_ollama"]) {
-    const text = await readFile(new URL(`../api/${dep}.js`, import.meta.url), "utf8");
+    const text = await readFile(new URL(`../server/${dep}.js`, import.meta.url), "utf8");
     source = source.replace(`./${dep}.js`, `data:text/javascript;base64,${Buffer.from(text).toString("base64")}`);
   }
   return import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}#${Math.random()}`);

@@ -7,7 +7,7 @@ async function importSource(relativePath) {
   let source = await readFile(new URL(relativePath, root), "utf8");
   for (const dependency of ["_guest-guard", "_ollama"]) {
     if (source.includes(`./${dependency}.js`)) {
-      const dependencySource = await readFile(new URL(`api/${dependency}.js`, root), "utf8");
+      const dependencySource = await readFile(new URL(`server/${dependency}.js`, root), "utf8");
       source = source.replace(`./${dependency}.js`, `data:text/javascript;base64,${Buffer.from(dependencySource).toString("base64")}`);
     }
   }
@@ -95,7 +95,7 @@ globalThis.fetch = async (url, options) => {
   };
 };
 
-const { default: imageHandler } = await importSource("api/image.js");
+const { default: imageHandler } = await importSource("server/image.js");
 const response = {
   writableEnded: false,
   once() {},
@@ -390,17 +390,17 @@ assert.match(guestUsageMigrationSource, /function public\.get_real_member_count/
 assert.match(guestUsageMigrationSource, /email_confirmed_at is not null/);
 assert.match(guestUsageMigrationSource, /not coalesce\(is_anonymous, false\)/);
 
-const guestGuardSource = await readFile(new URL("api/_guest-guard.js", root), "utf8");
+const guestGuardSource = await readFile(new URL("server/_guest-guard.js", root), "utf8");
 assert.match(guestGuardSource, /createHmac\("sha256"/);
 assert.match(guestGuardSource, /x-vercel-forwarded-for/);
 assert.match(guestGuardSource, /AUTOMATED_TRAFFIC_BLOCKED/);
 
-const betaStatusSource = await readFile(new URL("api/beta-status.js", root), "utf8");
-const chatApiSource = await readFile(new URL("api/chat.js", root), "utf8");
-const transcribeApiSource = await readFile(new URL("api/transcribe.js", root), "utf8");
-const billingStatusSource = await readFile(new URL("api/billing-status.js", root), "utf8");
-const billingCheckoutSource = await readFile(new URL("api/billing-checkout.js", root), "utf8");
-const billingPortalSource = await readFile(new URL("api/billing-portal.js", root), "utf8");
+const betaStatusSource = await readFile(new URL("server/beta-status.js", root), "utf8");
+const chatApiSource = await readFile(new URL("server/chat.js", root), "utf8");
+const transcribeApiSource = await readFile(new URL("server/transcribe.js", root), "utf8");
+const billingStatusSource = await readFile(new URL("server/billing-status.js", root), "utf8");
+const billingCheckoutSource = await readFile(new URL("server/billing-checkout.js", root), "utf8");
+const billingPortalSource = await readFile(new URL("server/billing-portal.js", root), "utf8");
 assert.doesNotMatch(appSource, /esm\.sh\/@supabase\/supabase-js/);
 assert.match(betaStatusSource, /rest\/v1\/beta_requests/);
 assert.match(betaStatusSource, /grant\.feature_key === "beta_lab"/);

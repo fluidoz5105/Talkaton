@@ -9,12 +9,12 @@ function sourceUrl(source) {
 }
 
 async function loadModules() {
-  const platformSource = await readFile(new URL("api/_platform-auth.js", root), "utf8");
+  const platformSource = await readFile(new URL("server/_platform-auth.js", root), "utf8");
   const platformUrl = sourceUrl(platformSource);
-  const keySource = (await readFile(new URL("api/_developer-keys.js", root), "utf8"))
+  const keySource = (await readFile(new URL("server/_developer-keys.js", root), "utf8"))
     .replace("./_platform-auth.js", platformUrl);
   const keyUrl = sourceUrl(keySource);
-  const githubSource = (await readFile(new URL("api/_github.js", root), "utf8"))
+  const githubSource = (await readFile(new URL("server/_github.js", root), "utf8"))
     .replace("./_platform-auth.js", platformUrl);
   const githubUrl = sourceUrl(githubSource);
   return { platformUrl, keyUrl, githubUrl };
@@ -90,7 +90,7 @@ test("developer key endpoint requires a confirmed bearer account and never lists
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-test-value";
   process.env.TALKATON_API_KEY_PEPPER = "test-pepper-with-at-least-thirty-two-characters";
   const { platformUrl, keyUrl } = await loadModules();
-  const { default: handler } = await loadEndpoint("api/developer-keys.js", {
+  const { default: handler } = await loadEndpoint("server/developer-keys.js", {
     "./_platform-auth.js": platformUrl,
     "./_developer-keys.js": keyUrl
   });
@@ -129,7 +129,7 @@ test("developer key endpoint requires a confirmed bearer account and never lists
 
 test("developer and GitHub endpoints reject untrusted origins and unsafe proposal paths", async () => {
   const { platformUrl, keyUrl, githubUrl } = await loadModules();
-  const { default: keyHandler } = await loadEndpoint("api/developer-keys.js", {
+  const { default: keyHandler } = await loadEndpoint("server/developer-keys.js", {
     "./_platform-auth.js": platformUrl,
     "./_developer-keys.js": keyUrl
   });
@@ -138,7 +138,7 @@ test("developer and GitHub endpoints reject untrusted origins and unsafe proposa
   assert.equal(response.statusCode, 403);
   assert.equal(response.body.code, "ORIGIN_NOT_ALLOWED");
 
-  const { default: pullRequestHandler } = await loadEndpoint("api/github.js", {
+  const { default: pullRequestHandler } = await loadEndpoint("server/github.js", {
     "./_platform-auth.js": platformUrl,
     "./_github.js": githubUrl
   });
