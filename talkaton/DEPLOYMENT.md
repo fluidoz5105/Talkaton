@@ -1,15 +1,15 @@
 # Talkaton publishing and service setup
 
-The GitHub repository is https://github.com/fluidoz5105/Talkaton. Its application root is `Talkaton Code/`.
+The GitHub repository is https://github.com/fluidoz5105/Talkaton. Its application root is `talkaton/`.
 Production Vercel project: `talkaton-tokn` (`prj_lYtFuMMZ4TUz9yOgXI01adXO72g1`), team `fluidoz5105s-projects`.
 
 ## Publish from GitHub
 
-1. Work in a checkout of the existing repository; preserve its history and the `Talkaton Code/` directory.
+1. Work in a checkout of the existing repository; preserve its history and the `talkaton/` directory.
 2. From the app directory run `npm test` and `npm run build`. The build updates service-worker cache versions.
 3. Review the diff and commit the intended source changes. Never commit `.env.local`, `.vercel`, keys, or build caches.
 4. Push the commit to GitHub. Use a branch preview until the required production services are configured.
-5. In the existing Vercel project's Settings → Git, connect `fluidoz5105/Talkaton`; production branch `main`. In Build settings set Root Directory to `Talkaton Code`, build command `npm run build`, output directory `.build-cache/public`.
+5. In the existing Vercel project's Settings → Git, connect `fluidoz5105/Talkaton`; production branch `main`. In Build settings set Root Directory to `talkaton`, build command `npm run build`, output directory `.build-cache/public`.
 6. Verify the Vercel deployment is READY and its Git commit SHA matches the pushed commit. Test Guest and signed-in Free chat, paid chat, login emails, and existing downloads before production promotion.
 
 Never publish a local-only Vercel upload. Every deployment must refer to a pushed Git commit. Do not replace the existing domain/project with a new project.
