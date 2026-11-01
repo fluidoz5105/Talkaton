@@ -1,19 +1,32 @@
+import route0 from "../server/auth-email.js";
+import route1 from "../server/beta-status.js";
+import route2 from "../server/billing-checkout.js";
+import route3 from "../server/billing-portal.js";
+import route4 from "../server/billing-status.js";
+import route5 from "../server/chat.js";
+import route6 from "../server/developer-keys.js";
+import route7 from "../server/github.js";
+import route8 from "../server/github-oauth.js";
+import route9 from "../server/image.js";
+import route10 from "../server/realtime-session.js";
+import route11 from "../server/search.js";
+import route12 from "../server/transcribe.js";
 // Keep one Vercel function while preserving every existing API URL.
 export const config = { api: { bodyParser: false } };
 const routes = {
-  "auth-email": () => import("../server/auth-email.js"),
-  "beta-status": () => import("../server/beta-status.js"),
-  "billing-checkout": () => import("../server/billing-checkout.js"),
-  "billing-portal": () => import("../server/billing-portal.js"),
-  "billing-status": () => import("../server/billing-status.js"),
-  "chat": () => import("../server/chat.js"),
-  "developer-keys": () => import("../server/developer-keys.js"),
-  "github": () => import("../server/github.js"),
-  "github-oauth": () => import("../server/github-oauth.js"),
-  "image": () => import("../server/image.js"),
-  "realtime-session": () => import("../server/realtime-session.js"),
-  "search": () => import("../server/search.js"),
-  "transcribe": () => import("../server/transcribe.js"),
+  "auth-email": route0,
+  "beta-status": route1,
+  "billing-checkout": route2,
+  "billing-portal": route3,
+  "billing-status": route4,
+  "chat": route5,
+  "developer-keys": route6,
+  "github": route7,
+  "github-oauth": route8,
+  "image": route9,
+  "realtime-session": route10,
+  "search": route11,
+  "transcribe": route12,
 };
 export default async function handler(req, res) {
   const route = req.query?.endpoint;
@@ -39,6 +52,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid request body." });
     }
   }
-  const { default: endpoint } = await routes[route]();
+  const endpoint = routes[route];
   return endpoint(req, res);
 }
